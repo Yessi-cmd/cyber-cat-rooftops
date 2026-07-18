@@ -104,6 +104,7 @@ class GameApp {
     switch (this.stateMachine.state) {
       case "ready":
         this.stateMachine.send("start");
+        this.audio.setAmbientActive(true);
         this.jump();
         this.liveStatus.textContent = CONTENT.live.started;
         break;
@@ -123,10 +124,12 @@ class GameApp {
     this.shell.focus({ preventScroll: true });
     if (this.stateMachine.state === "ready") {
       this.stateMachine.send("start");
+      this.audio.setAmbientActive(true);
       this.jump();
       this.liveStatus.textContent = CONTENT.live.started;
     } else if (this.stateMachine.state === "paused") {
       this.stateMachine.send("resume");
+      this.audio.setAmbientActive(true);
       this.liveStatus.textContent = CONTENT.live.resumed;
     } else if (this.stateMachine.state === "gameOver") {
       this.restart(false);
@@ -154,9 +157,11 @@ class GameApp {
   private togglePause(): void {
     if (this.stateMachine.state === "playing") {
       this.stateMachine.send("pause");
+      this.audio.setAmbientActive(false);
       this.liveStatus.textContent = CONTENT.live.paused;
     } else if (this.stateMachine.state === "paused") {
       this.stateMachine.send("resume");
+      this.audio.setAmbientActive(true);
       this.liveStatus.textContent = CONTENT.live.resumed;
     }
     this.renderUi();
@@ -167,6 +172,7 @@ class GameApp {
       return;
     }
     this.stateMachine.send("pause");
+    this.audio.setAmbientActive(false);
     this.renderUi();
   }
 
@@ -185,6 +191,7 @@ class GameApp {
       return;
     }
 
+    this.audio.setAmbientActive(false);
     const score = this.session.snapshot().score;
     if (score > this.bestScore) {
       this.bestScore = score;
@@ -202,6 +209,7 @@ class GameApp {
     this.session.reset(this.createSeed());
     this.lastGrounded = true;
     this.lastPlatformId = 0;
+    this.audio.setAmbientActive(true);
     if (jumpImmediately) {
       this.jump();
     }
