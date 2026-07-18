@@ -163,6 +163,22 @@ describe("AudioController", () => {
     expect(context.oscillators).toHaveLength(9);
   });
 
+  it("连续五十局启停后没有未停止的旧环境声源", () => {
+    const context = new FakeAudioContext();
+    const controller = new AudioController(
+      false,
+      () => context as unknown as AudioContext,
+    );
+
+    for (let round = 0; round < 50; round += 1) {
+      controller.setAmbientActive(true);
+      controller.setAmbientActive(false);
+    }
+
+    expect(context.oscillators).toHaveLength(150);
+    expect(context.oscillators.every((oscillator) => oscillator.stopCount === 1)).toBe(true);
+  });
+
   it("音频实现缺失或创建失败时保持静默降级", () => {
     const controller = new AudioController(false, () => {
       throw new Error("AudioContext unavailable");
