@@ -2,6 +2,8 @@
 
 生产地址：`https://game.norliva.top/`
 
+状态：2026-07-18 首次部署完成；当前站点与回滚证据见 `M4_DEPLOYMENT_REPORT.md`。
+
 ## 架构
 
 - Cloudflare 管理 `norliva.top` DNS，并代理 `game` 子域流量。

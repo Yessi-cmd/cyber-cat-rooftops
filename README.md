@@ -2,6 +2,8 @@
 
 一款面向公开用户的竖屏像素风跑酷网页游戏：可爱的小猫在温暖的赛博城市楼顶间持续跳跃。画面向下滚动，速度与难度随分数提升。
 
+在线试玩：<https://game.norliva.top/>
+
 ## 项目状态
 
 M1/M2 工程校准已完成，M3 美术、音效与可访问性的工程实现及桌面验收已完成；iPhone Safari 最新核心玩法回归通过，新增环境音与减少动态的最终实机签字待复验，Android 验证保留到 M4。当前包含：
@@ -25,6 +27,7 @@ M3 制作依据：
 - [M3 阶段验收记录](docs/M3_ACCEPTANCE_REPORT.md)
 - [M3 发布视觉记录](docs/M3_RELEASE_VISUALS.md)
 - [生产部署与回滚手册](docs/DEPLOYMENT.md)
+- [M4 首次部署验收记录](docs/M4_DEPLOYMENT_REPORT.md)
 
 ## 本地运行
 

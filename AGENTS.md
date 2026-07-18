@@ -17,7 +17,7 @@
 
 ## 2. 当前阶段与默认决策
 
-项目当前已完成 M1/M2 工程校准和 M3 工程验收，iPhone Safari 核心玩法回归通过；新增环境音、减少动态与连续三局待用户 iPhone 最终签字，Android 验证按产品决定保留到 M4。签字后进入 M4 测试与发布。除非用户另有明确要求，按以下默认值推进：
+项目当前已完成 M1/M2 工程校准和 M3 工程验收，生产站 `https://game.norliva.top/` 已在 RackNerd VPS + Cloudflare 上线，M4 发布验收正在进行。iPhone Safari 核心玩法回归通过；新增环境音、减少动态与连续三局待用户用生产站最终签字，Android 验证按产品决定保留到 M4。除非用户另有明确要求，按以下默认值推进：
 
 - 首版是由 RackNerd VPS + Caddy 托管、经 Cloudflare DNS/CDN 代理的纯静态单机游戏，生产地址为 `https://game.norliva.top/`；不实现应用服务器、登录、昵称或全球排行榜。
 - 使用 Vite、严格模式 TypeScript、Canvas 2D 和原生 DOM/CSS，不引入大型游戏引擎或 UI 框架。

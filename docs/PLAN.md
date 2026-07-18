@@ -165,6 +165,7 @@ cyber-cat-rooftops/
 - 测试 Chrome/Safari/Edge、iOS Safari、Android Chrome 和桌面触控板/键盘。
 - 检查离线缓存、首屏资源、断网提示、分享卡片和错误页。
 - 在 RackNerd VPS 建立版本化静态发布目录、Caddy 站点、Cloudflare 代理域名和可回滚部署脚本。
+- **当前进度（2026-07-18）**：`game.norliva.top` 已通过 Cloudflare proxied A 记录上线；Caddy 自动 HTTPS、压缩、安全头、HTML no-cache、哈希资源 immutable 缓存、版本目录、原子切换与五版本保留已启用。公网浏览器的开始、暂停、继续、静音、失败与重开路径通过；iPhone M3 签字、Android Chrome、跨浏览器矩阵和发布性能检查仍待完成。
 - **验收**：预览地址和正式域名均可玩；HTTPS、缓存、移动端操作和重开路径正常。
 
 ### M5：排行榜（发布后按数据决定）
