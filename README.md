@@ -24,6 +24,7 @@ M3 制作依据：
 - [M3 概念板与方向记录](docs/M3_CONCEPT_NOTES.md)
 - [M3 阶段验收记录](docs/M3_ACCEPTANCE_REPORT.md)
 - [M3 发布视觉记录](docs/M3_RELEASE_VISUALS.md)
+- [生产部署与回滚手册](docs/DEPLOYMENT.md)
 
 ## 本地运行
 
@@ -40,6 +41,12 @@ npm run dev
 npm run typecheck
 npm test
 npm run build
+```
+
+生产发布（需要本机已配置 `racknerd-vps` SSH 别名）：
+
+```bash
+npm run deploy:vps
 ```
 
 ## 目标体验

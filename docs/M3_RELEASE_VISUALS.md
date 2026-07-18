@@ -39,4 +39,4 @@ Constraints: no text, no letters, no logos, no watermark; exactly one cat; scarf
 Avoid: photorealism, 3D rendering, dense neon, cold cyberpunk clutter, violence, recognizable commercial game characters, tiny noisy details in the left negative-space area
 ```
 
-当前 `og:image` 使用站点根路径 `/og-card.jpg`。正式域名尚未确定，M4 部署时再补绝对分享 URL，避免提前硬编码错误域名。
+正式生产域名已确定为 `https://game.norliva.top/`；`canonical`、`og:url`、`og:image` 与 `twitter:image` 均使用该域名的绝对 URL，便于社交爬虫稳定读取分享卡。

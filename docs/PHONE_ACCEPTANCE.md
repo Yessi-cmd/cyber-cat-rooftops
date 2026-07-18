@@ -31,7 +31,7 @@
 2. macOS 防火墙是否允许 Node.js 接收入站连接。
 3. 暂时关闭手机蜂窝网络，排除浏览器绕过 Wi-Fi。
 4. 在开发机运行 `ipconfig getifaddr en0` 核对 Wi-Fi 地址。
-5. 不要把开发端口直接暴露到公网；跨网络测试使用 Cloudflare Pages 预览部署。
+5. 不要把开发端口直接暴露到公网；部署完成后跨网络测试使用 `https://game.norliva.top/`。
 
 ## 3. 测试前记录
 

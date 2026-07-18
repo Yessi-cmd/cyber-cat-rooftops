@@ -1,0 +1,24 @@
+game.norliva.top {
+	root * /var/www/cyber-cat-rooftops/current
+	encode zstd gzip
+
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; media-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+	}
+
+	@entry path / /index.html
+	header @entry Cache-Control "no-cache"
+
+	@immutable path /assets/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	@share path /favicon.svg /og-card.jpg
+	header @share Cache-Control "public, max-age=86400"
+
+	file_server
+}
