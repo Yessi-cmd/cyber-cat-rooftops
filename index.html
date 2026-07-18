@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#17162f" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta
+      name="description"
+      content="一只小猫在温暖的赛博城市楼顶间跳跃。轻触屏幕，别掉下去！"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:title" content="赛博小猫跳楼顶" />
+    <meta
+      property="og:description"
+      content="轻触屏幕，让围巾小猫跃过温暖的赛博城市楼顶。"
+    />
+    <meta property="og:image" content="/og-card.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="橘白小猫戴着珊瑚围巾跃过温暖的夜间城市楼顶" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <title>赛博小猫跳楼顶</title>
+  </head>
+  <body>
+    <main class="page-shell">
+      <section id="game-shell" class="game-shell" tabindex="0" aria-label="赛博小猫跳楼顶游戏区域">
+        <canvas id="game-canvas" aria-label="游戏画面"></canvas>
+
+        <div class="hud">
+          <span id="score" aria-label="当前分数">0000</span>
+          <div class="hud-controls">
+            <button id="sound-button" class="icon-button" type="button" aria-label="静音"></button>
+            <button id="pause-button" class="icon-button" type="button" aria-label="暂停游戏"></button>
+          </div>
+        </div>
+
+        <div id="overlay" class="overlay">
+          <div class="panel">
+            <div class="brand-lockup" aria-hidden="true">
+              <img class="brand-mark" src="/favicon.svg" width="40" height="40" alt="" />
+              <p id="eyebrow" class="eyebrow">CYBER CAT ROOFTOPS</p>
+            </div>
+            <h1 id="overlay-title">赛博小猫跳楼顶</h1>
+            <p id="overlay-copy">轻触画面或按空格，让小猫跃过楼顶间隙。</p>
+            <p id="result" class="result" hidden></p>
+            <button id="primary-button" class="primary-button" type="button">开始跳跃</button>
+          </div>
+        </div>
+
+        <div id="rotate-hint" class="rotate-hint">竖屏体验更顺手</div>
+        <p id="live-status" class="sr-only" aria-live="polite"></p>
+      </section>
+
+      <p class="desktop-help">空格 / ↑ / W 跳跃 · P / Esc 暂停</p>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
