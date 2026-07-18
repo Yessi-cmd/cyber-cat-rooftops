@@ -23,9 +23,11 @@ release="$(date -u +%Y%m%dT%H%M%SZ)-${commit}"
 release_dir="${APP_ROOT}/releases/${release}"
 
 ssh "${SSH_HOST}" "install -d -o caddy -g caddy -m 0755 '${release_dir}'"
-rsync --archive --delete --chmod=D0755,F0644 dist/ "${SSH_HOST}:${release_dir}/"
+rsync --archive --delete dist/ "${SSH_HOST}:${release_dir}/"
 
 ssh "${SSH_HOST}" "set -eu
+  find '${release_dir}' -type d -exec chmod 0755 {} +
+  find '${release_dir}' -type f -exec chmod 0644 {} +
   chown -R caddy:caddy '${release_dir}'
   ln -s '${release_dir}' '${APP_ROOT}/current.next'
   mv -Tf '${APP_ROOT}/current.next' '${APP_ROOT}/current'
