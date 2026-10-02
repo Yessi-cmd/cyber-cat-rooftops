@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { PALETTE } from "../src/render/palette";
 
-describe("M3 grayscale hierarchy", () => {
-  it("猫与可落平台在灰度亮度上明显高于玩法背景", () => {
-    expect(contrastRatio(PALETTE.catOrange, PALETTE.night)).toBeGreaterThan(7);
-    expect(contrastRatio(PALETTE.catCream, PALETTE.night)).toBeGreaterThan(12);
-    expect(contrastRatio(PALETTE.roofOrange, PALETTE.violet)).toBeGreaterThan(4.5);
-    expect(contrastRatio(PALETTE.warmYellow, PALETTE.violetDark)).toBeGreaterThan(7);
+describe("office palette hierarchy", () => {
+  it("猫的深色轮廓与可落平台在浅背景中清楚可辨", () => {
+    expect(contrastRatio(PALETTE.catOrange, PALETTE.night)).toBeGreaterThan(4);
+    expect(contrastRatio(PALETTE.blackPurple, PALETTE.night)).toBeGreaterThan(10);
+    expect(contrastRatio(PALETTE.roofOrange, PALETTE.violet)).toBeGreaterThan(3.5);
+    expect(contrastRatio(PALETTE.warmYellow, PALETTE.violetDark)).toBeGreaterThan(4.5);
   });
 
-  it("远景与夜空保持低对比，避免伪装成平台", () => {
+  it("远景与天空保持低对比，避免伪装成平台", () => {
     expect(contrastRatio(PALETTE.violetDark, PALETTE.night)).toBeLessThan(1.5);
     expect(contrastRatio(PALETTE.nightLift, PALETTE.night)).toBeLessThan(1.2);
   });

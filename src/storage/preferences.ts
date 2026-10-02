@@ -7,7 +7,7 @@ export interface SaveData {
   muted: boolean;
 }
 
-const DEFAULT_SAVE: SaveData = { version: SCHEMA_VERSION, bestScore: 0, muted: false };
+const DEFAULT_SAVE: SaveData = { version: SCHEMA_VERSION, bestScore: 0, muted: true };
 
 function validBestScore(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
@@ -39,7 +39,7 @@ export function decodeSave(raw: string | null): SaveData {
     }
 
     if (value.version === 1 && "bestScore" in value && validBestScore(value.bestScore)) {
-      return { version: SCHEMA_VERSION, bestScore: Math.floor(value.bestScore), muted: false };
+      return { version: SCHEMA_VERSION, bestScore: Math.floor(value.bestScore), muted: true };
     }
   } catch {
     return { ...DEFAULT_SAVE };

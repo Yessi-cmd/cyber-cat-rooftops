@@ -3,15 +3,26 @@ import type { GameState } from "../game/types";
 type OverlayState = Exclude<GameState, "playing">;
 
 export const CONTENT = {
+  document: {
+    category: "个人工作区 / 随记",
+    tag: "仅本地",
+    kicker: "DAILY NOTES",
+    title: "今日随记",
+    intro: "留一点空白，换个思路。",
+    section: "01 / 片刻小憩",
+    hint: "随时暂停",
+    footer: "不必赶进度，准备好了再继续。",
+    brand: "BREAK TIME",
+  },
   overlay: {
     ready: {
       title: "赛博小猫跳楼顶",
-      copy: "轻触画面或按空格，让小猫跃过楼顶间隙。",
+      copy: "轻触或空格跳跃，切走自动暂停，随时歇一会儿。",
       action: "开始跳跃",
     },
     paused: {
       title: "稍作休息",
-      copy: "返回后需要手动继续，小猫会在原地等你。",
+      copy: "小猫在原地等你，准备好后点「继续游戏」。",
       action: "继续游戏",
     },
     gameOver: {

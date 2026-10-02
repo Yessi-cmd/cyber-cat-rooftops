@@ -44,6 +44,9 @@ class GameApp {
   private accumulator = 0;
 
   constructor() {
+    for (const [key, text] of Object.entries(CONTENT.document)) {
+      requiredElement<HTMLElement>(`[data-document="${key}"]`).textContent = text;
+    }
     this.session.setViewWidth(this.renderer.viewWidth);
     new InputController(this.shell, this.canvas, this.handleInput);
     this.primaryButton.addEventListener("click", this.handlePrimaryClick);
@@ -101,7 +104,7 @@ class GameApp {
       return;
     }
     if (action === "pause") {
-      this.togglePause();
+      this.pauseForInterruption();
       return;
     }
 
@@ -142,7 +145,7 @@ class GameApp {
   };
 
   private readonly handlePauseClick = (): void => {
-    this.togglePause();
+    this.pauseForInterruption();
     this.shell.focus({ preventScroll: true });
   };
 
@@ -157,19 +160,6 @@ class GameApp {
     this.renderSoundButton();
     this.shell.focus({ preventScroll: true });
   };
-
-  private togglePause(): void {
-    if (this.stateMachine.state === "playing") {
-      this.stateMachine.send("pause");
-      this.audio.setAmbientActive(false);
-      this.liveStatus.textContent = CONTENT.live.paused;
-    } else if (this.stateMachine.state === "paused") {
-      this.stateMachine.send("resume");
-      this.audio.setAmbientActive(true);
-      this.liveStatus.textContent = CONTENT.live.resumed;
-    }
-    this.renderUi();
-  }
 
   private pauseForInterruption(): void {
     if (this.stateMachine.state !== "playing") {
@@ -223,6 +213,7 @@ class GameApp {
 
   private renderUi(): void {
     const state = this.stateMachine.state;
+    this.shell.dataset.state = state;
     this.pauseButton.hidden = state !== "playing";
     renderUiIcon(this.pauseButton, "pause");
     this.pauseButton.setAttribute("aria-label", CONTENT.aria.pause);

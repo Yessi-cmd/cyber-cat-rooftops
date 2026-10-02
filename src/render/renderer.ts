@@ -40,9 +40,10 @@ export class Renderer {
     context.save();
     context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     context.imageSmoothingEnabled = false;
-    this.drawSky(snapshot.cameraX, snapshot.cameraY, reducedMotion);
-    this.drawPlatforms(snapshot, reducedMotion, nowMs);
-    this.drawCat(snapshot, gameState, reducedMotion, nowMs);
+    // Keep decorative layers still in the document-style presentation.
+    this.drawSky(0, 0, true);
+    this.drawPlatforms(snapshot, true, nowMs);
+    this.drawCat(snapshot, gameState, reducedMotion || gameState !== "playing", nowMs);
     context.restore();
   }
 
@@ -71,7 +72,7 @@ export class Renderer {
     context.fillRect(0, 0, this.logicalWidth, GAME_HEIGHT);
 
     context.fillStyle = PALETTE.warmYellow;
-    context.globalAlpha = 0.72;
+    context.globalAlpha = 0.08;
     const starCount = Math.ceil(this.logicalWidth / 22);
     for (let index = 0; index < starCount; index += 1) {
       const x = (index * 83 + 29) % this.logicalWidth;
@@ -323,10 +324,6 @@ export class Renderer {
       this.landingStartedAtMs = null;
     }
 
-    if (pose.animation === "land" && !reducedMotion && this.landingStartedAtMs !== null) {
-      this.drawLandingDust(x, y + cat.height, nowMs - this.landingStartedAtMs);
-    }
-
     context.fillStyle = PALETTE.blackPurple;
     context.fillRect(x - 4, y + 11 + bob + pose.tailLift, 7, 10);
     context.fillRect(x - 7, y + 7 + bob + pose.tailLift, 5, 8);
@@ -369,19 +366,6 @@ export class Renderer {
     context.fillStyle = PALETTE.catCream;
     context.fillRect(x + 4, y + 25 + bob + pose.backLegOffset, 5, 2);
     context.fillRect(x + 15, y + 25 + bob + pose.frontLegOffset, 5, 2);
-  }
-
-  private drawLandingDust(x: number, floorY: number, elapsedMs: number): void {
-    const context = this.context;
-    const progress = Math.min(1, elapsedMs / LAND_ANIMATION_DURATION_MS);
-    const spread = Math.round(progress * 9);
-    const lift = Math.round(progress * 5);
-    context.save();
-    context.globalAlpha = 0.68 * (1 - progress);
-    context.fillStyle = PALETTE.smoke;
-    context.fillRect(x - 3 - spread, floorY - 2 - lift, 4, 3);
-    context.fillRect(x + 21 + spread, floorY - 3 - Math.round(lift * 0.6), 5, 3);
-    context.restore();
   }
 
   private positiveModulo(value: number, divisor: number): number {
