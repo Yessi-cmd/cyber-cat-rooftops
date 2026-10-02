@@ -38,6 +38,44 @@ function playIdealSession(
 }
 
 describe("GameSession", () => {
+  it("同种子同输入在手机、桌面及中途缩放时保持相同规则结果", () => {
+    for (const seed of [1, 42, 20260718]) {
+      const phone = new GameSession(seed);
+      const desktop = new GameSession(seed);
+      const resized = new GameSession(seed);
+      desktop.setViewWidth(1_055);
+      const sessions = [phone, desktop, resized];
+      const generated = sessions.map(() => new Map<number, string>());
+      for (let step = 0; step < 90 / PHYSICS.fixedStep; step += 1) {
+        if (step % 600 === 0) resized.setViewWidth(step % 1200 === 0 ? 1_400 : 390);
+        const { cat, platforms } = phone.snapshot();
+        const current = platforms.find((p) => p.id === cat.platformId);
+        const next = platforms.find((p) => p.id === (cat.platformId ?? -1) + 1);
+        if (cat.grounded && current && next) {
+          const flight = descendingFlightTime(next.y - current.y);
+          if (flight !== null && cat.x >= next.x - cat.width + 8 - cat.vx * flight) {
+            for (const session of sessions) session.jump();
+          }
+        }
+        for (const [index, session] of sessions.entries()) {
+          expect(session.update(PHYSICS.fixedStep), `seed=${seed}, step=${step}`).toBe(false);
+          for (const platform of session.snapshot().platforms) {
+            generated[index]!.set(platform.id, JSON.stringify(platform));
+          }
+        }
+        for (const session of [desktop, resized]) {
+          expect(session.snapshot().cat).toEqual(phone.snapshot().cat);
+          expect(session.snapshot().score).toBe(phone.snapshot().score);
+        }
+      }
+      expect(phone.snapshot().score).toBeGreaterThan(500);
+      for (const [id, platform] of generated[0]!) {
+        expect(generated[1]!.get(id)).toBe(platform);
+        expect(generated[2]!.get(id)).toBe(platform);
+      }
+    }
+  });
+
   it("重置后恢复干净且保留给定种子", () => {
     const session = new GameSession(42);
     session.jump();

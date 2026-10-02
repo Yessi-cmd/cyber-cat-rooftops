@@ -186,7 +186,11 @@ export class GameSession {
 
     const requiredX = this.cameraX + this.viewWidth + GAME_WIDTH;
     while (last.x + last.width < requiredX) {
-      const next = this.generator.next(last, this.score);
+      // Estimate progress at this roof, independently of when it enters the viewport.
+      const generationScore =
+        Math.floor(Math.max(0, last.x - 70) / SCORE.distancePixelsPerPoint) +
+        last.id * SCORE.landingBonus;
+      const next = this.generator.next(last, generationScore);
       this.platforms.push(next);
       last = next;
     }

@@ -96,6 +96,10 @@ class GameApp {
   };
 
   private readonly handleInput = (action: InputAction): void => {
+    if (action === "blur") {
+      this.pauseForInterruption();
+      return;
+    }
     if (action === "pause") {
       this.togglePause();
       return;
@@ -173,6 +177,7 @@ class GameApp {
     }
     this.stateMachine.send("pause");
     this.audio.setAmbientActive(false);
+    this.liveStatus.textContent = CONTENT.live.paused;
     this.renderUi();
   }
 
