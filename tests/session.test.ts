@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PHYSICS } from "../src/game/config";
-import { descendingFlightTime } from "../src/game/platform-generator";
+import { shouldJump } from "./helpers/auto-player";
 import { GameSession } from "../src/game/session";
 import type { Cat, WorldSnapshot } from "../src/game/types";
 
@@ -15,21 +15,7 @@ function playIdealSession(
 
   for (let index = 0; index < seconds / PHYSICS.fixedStep && !lost; index += 1) {
     const snapshot = session.snapshot();
-    const { cat } = snapshot;
-    if (cat.grounded && cat.platformId !== null) {
-      const current = snapshot.platforms.find((platform) => platform.id === cat.platformId);
-      const next = snapshot.platforms.find((platform) => platform.id === cat.platformId! + 1);
-      if (current !== undefined && next !== undefined) {
-        const flightTime = descendingFlightTime(next.y - current.y);
-        if (flightTime !== null) {
-          const safeLandingX = next.x - cat.width + 8;
-          const launchX = safeLandingX - cat.vx * flightTime;
-          if (cat.x >= launchX) {
-            session.jump();
-          }
-        }
-      }
-    }
+    if (shouldJump(snapshot)) session.jump();
 
     lost = session.update(PHYSICS.fixedStep);
   }
@@ -101,14 +87,8 @@ describe("GameSession", () => {
       const generated = sessions.map(() => new Map<number, string>());
       for (let step = 0; step < 90 / PHYSICS.fixedStep; step += 1) {
         if (step % 600 === 0) resized.setViewWidth(step % 1200 === 0 ? 1_400 : 390);
-        const { cat, platforms } = phone.snapshot();
-        const current = platforms.find((p) => p.id === cat.platformId);
-        const next = platforms.find((p) => p.id === (cat.platformId ?? -1) + 1);
-        if (cat.grounded && current && next) {
-          const flight = descendingFlightTime(next.y - current.y);
-          if (flight !== null && cat.x >= next.x - cat.width + 8 - cat.vx * flight) {
-            for (const session of sessions) session.jump();
-          }
+        if (shouldJump(phone.snapshot())) {
+          for (const session of sessions) session.jump();
         }
         for (const [index, session] of sessions.entries()) {
           expect(session.update(PHYSICS.fixedStep), `seed=${seed}, step=${step}`).toBe(false);

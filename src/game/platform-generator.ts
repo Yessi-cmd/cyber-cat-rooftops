@@ -1,5 +1,6 @@
-import { MIN_ROOF_WORLD_Y, PHYSICS, getDifficulty } from "./config";
+import { MIN_ROOF_WORLD_Y, PHYSICS, ROOF_FEATURES, getDifficulty } from "./config";
 import { SeededRandom } from "./random";
+import { addRoofFeatures, hasHazardRoof } from "./roof-features";
 import type { Platform } from "./types";
 
 const REACH_SAFETY = 14;
@@ -58,6 +59,7 @@ export class PlatformGenerator {
 
   next(previous: Platform, score: number): Platform {
     const difficulty = getDifficulty(score);
+    const hazardRoof = hasHazardRoof(this.nextId, score);
 
     for (let attempt = 0; attempt < 24; attempt += 1) {
       const gap = Math.round(this.random.between(difficulty.minGap, difficulty.maxGap));
@@ -68,7 +70,9 @@ export class PlatformGenerator {
         id: this.nextId,
         x: previous.x + previous.width + gap,
         y: Math.max(MIN_ROOF_WORLD_Y, previous.y + yOffset),
-        width: Math.round(this.random.between(difficulty.minWidth, difficulty.maxWidth)),
+        width: hazardRoof
+          ? ROOF_FEATURES.hazardPlatformWidth
+          : Math.round(this.random.between(difficulty.minWidth, difficulty.maxWidth)),
         height: 36,
       };
 
@@ -79,7 +83,7 @@ export class PlatformGenerator {
         !isPlatformReachableWithoutJump(previous, candidate, difficulty.runSpeed)
       ) {
         this.nextId += 1;
-        return candidate;
+        return addRoofFeatures(previous, candidate, hazardRoof);
       }
     }
 
@@ -87,10 +91,10 @@ export class PlatformGenerator {
       id: this.nextId,
       x: previous.x + previous.width + difficulty.minGap,
       y: previous.y,
-      width: difficulty.maxWidth,
+      width: hazardRoof ? ROOF_FEATURES.hazardPlatformWidth : difficulty.maxWidth,
       height: 36,
     };
     this.nextId += 1;
-    return fallback;
+    return addRoofFeatures(previous, fallback, hazardRoof);
   }
 }

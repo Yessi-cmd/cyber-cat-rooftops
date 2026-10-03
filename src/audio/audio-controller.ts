@@ -1,4 +1,4 @@
-export type SoundCue = "jump" | "land" | "score" | "fail" | "toggle";
+export type SoundCue = "jump" | "land" | "score" | "fail" | "toggle" | "collect";
 
 interface CueDefinition {
   frequencies: readonly number[];
@@ -18,6 +18,7 @@ interface AmbientGraph {
 export type AudioContextFactory = () => AudioContext;
 
 const CUES: Record<SoundCue, CueDefinition> = {
+  collect: { frequencies: [880, 1100], duration: 0.08, gain: 0.02, type: "sine" },
   jump: { frequencies: [330, 520], duration: 0.09, gain: 0.035, type: "square" },
   land: { frequencies: [150, 110], duration: 0.07, gain: 0.025, type: "triangle" },
   score: { frequencies: [660, 880], duration: 0.11, gain: 0.025, type: "square" },

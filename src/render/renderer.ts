@@ -1,5 +1,5 @@
 import { GAME_HEIGHT, GAME_WIDTH } from "../game/config";
-import type { GameState, WorldSnapshot } from "../game/types";
+import type { GameState, WorldSnapshot, WorldRect } from "../game/types";
 import { LAND_ANIMATION_DURATION_MS, selectCatPose } from "./cat-animation";
 import { PALETTE } from "./palette";
 import {
@@ -43,6 +43,7 @@ export class Renderer {
     // Keep decorative layers still in the document-style presentation.
     this.drawSky(0, 0, true);
     this.drawPlatforms(snapshot, true, nowMs);
+    this.drawFeatures(snapshot);
     this.drawCat(snapshot, gameState, reducedMotion || gameState !== "playing", nowMs);
     context.restore();
   }
@@ -162,7 +163,7 @@ export class Renderer {
       }
 
       const decoration = selectRoofDecoration(platform.id, platform.width);
-      if (decoration !== "none") {
+      if (decoration !== "none" && !platform.hazard) {
         const offset = getRoofDecorationOffset(platform.id, platform.width, decoration);
         this.drawRoofDecoration(
           decoration,
@@ -207,6 +208,45 @@ export class Renderer {
         }
       }
     }
+  }
+
+  private drawFeatures(snapshot: WorldSnapshot): void {
+    const context = this.context;
+    for (const platform of snapshot.platforms) {
+      if (platform.hazard) {
+        const x = Math.round(platform.hazard.x - snapshot.cameraX);
+        const y = Math.round(platform.hazard.y - snapshot.cameraY);
+        if (x + platform.hazard.width >= 0 && x <= this.logicalWidth) {
+          context.fillStyle = PALETTE.hazard;
+          context.fillRect(x, y, platform.hazard.width, platform.hazard.height);
+          context.fillStyle = PALETTE.catCream;
+          // Diagonal warning bands distinguish solid hazards from harmless props.
+          for (let band = 0; band < 3; band += 1) {
+            context.fillRect(x + 2 + band * 7, y + 3, 3, 5);
+            context.fillRect(x + 4 + band * 7, y + 8, 3, 5);
+          }
+          context.fillStyle = PALETTE.blackPurple;
+          context.fillRect(x, y + platform.hazard.height - 3, platform.hazard.width, 3);
+        }
+      }
+      for (const reward of platform.rewards ?? []) {
+        if (!reward.collected) this.drawReward(reward, snapshot.cameraX, snapshot.cameraY);
+      }
+    }
+  }
+
+  private drawReward(reward: WorldRect, cameraX: number, cameraY: number): void {
+    const x = Math.round(reward.x - cameraX);
+    const y = Math.round(reward.y - cameraY);
+    if (x + reward.width < 0 || x > this.logicalWidth) return;
+    const context = this.context;
+    context.fillStyle = PALETTE.reward;
+    context.fillRect(x + 4, y + 2, 10, 6);
+    context.fillRect(x + 7, y, 5, 10);
+    context.fillRect(x, y + 1, 3, 8);
+    context.fillRect(x + 3, y + 3, 3, 4);
+    context.fillStyle = PALETTE.catCream;
+    context.fillRect(x + 10, y + 3, 2, 2);
   }
 
   private drawRoofDecoration(

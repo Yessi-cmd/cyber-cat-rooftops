@@ -43,7 +43,10 @@
         <canvas id="game-canvas" aria-label="游戏画面"></canvas>
 
         <div class="hud">
-          <span id="score" aria-label="当前分数">0000</span>
+          <div class="score-group">
+            <span id="score" aria-label="当前分数">0000</span>
+            <span id="loot-count" aria-label="收集鱼干数量">鱼干 × 0</span>
+          </div>
           <div class="hud-controls">
             <button id="sound-button" class="icon-button" type="button" aria-label="静音"></button>
             <button id="pause-button" class="icon-button" type="button" aria-label="暂停游戏"></button>
@@ -57,7 +60,7 @@
               <p id="eyebrow" class="eyebrow" data-document="brand">BREAK TIME</p>
             </div>
             <h1 id="overlay-title">赛博小猫跳楼顶</h1>
-            <p id="overlay-copy">轻触或空格跳跃，切走自动暂停，随时歇一会儿。</p>
+            <p id="overlay-copy">轻触或空格跳跃，躲开红色路障，收集鱼干加分。</p>
             <p id="result" class="result" hidden></p>
             <button id="primary-button" class="primary-button" type="button">开始跳跃</button>
           </div>

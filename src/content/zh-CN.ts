@@ -17,7 +17,7 @@ export const CONTENT = {
   overlay: {
     ready: {
       title: "赛博小猫跳楼顶",
-      copy: "轻触或空格跳跃，切走自动暂停，随时歇一会儿。",
+      copy: "轻触或空格跳跃，躲开红色路障，收集鱼干加分。",
       action: "开始跳跃",
     },
     paused: {
@@ -45,6 +45,8 @@ export const CONTENT = {
     unmuted: "声音已开启",
     gameOver: (score: number): string => `游戏结束，本局 ${score} 分`,
   },
+  loot: (count: number): string => `鱼干 × ${count}`,
+  hazardFailure: "碰到路障了。提前起跳，越过条纹挡板。",
   result: (score: number, bestScore: number): string =>
     `本局 ${score} · 最高 ${bestScore}`,
 } as const;

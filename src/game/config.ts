@@ -23,6 +23,17 @@ export const SCORE = {
   landingBonus: 8,
 } as const;
 
+export const ROOF_FEATURES = {
+  firstHazardId: 3,
+  hazardPlatformWidth: 340,
+  hazardWidth: 24,
+  hazardHeight: 20,
+  hazardOffset: 120,
+  rewardWidth: 16,
+  rewardHeight: 10,
+  rewardPoints: 5,
+} as const;
+
 export const CAMERA = {
   horizontalLead: 112,
   verticalLead: 520,

@@ -1,4 +1,5 @@
-import { CAMERA, GAME_HEIGHT, GAME_WIDTH, PHYSICS, SCORE, getDifficulty } from "./config";
+import { CAMERA, GAME_HEIGHT, GAME_WIDTH, PHYSICS, ROOF_FEATURES, SCORE, getDifficulty } from "./config";
+import { sweptCatIntersects } from "./swept-collision";
 import { PlatformGenerator } from "./platform-generator";
 import type { Cat, Platform, WorldSnapshot } from "./types";
 
@@ -25,6 +26,8 @@ export class GameSession {
   private coyoteRemaining = 0;
   private jumpBufferRemaining = 0;
   private jumps = 0;
+  private collectedCount = 0;
+  private failureReason: "fall" | "hazard" | null = null;
 
   get jumpCount(): number {
     return this.jumps;
@@ -50,12 +53,15 @@ export class GameSession {
     this.coyoteRemaining = 0;
     this.jumpBufferRemaining = 0;
     this.jumps = 0;
+    this.collectedCount = 0;
+    this.failureReason = null;
     this.landingBonus = 0;
     this.furthestPlatformId = START_PLATFORM.id;
     this.fillPlatforms();
   }
 
   jump(): boolean {
+    if (this.failureReason !== null) return false;
     if (!this.cat.grounded && this.coyoteRemaining <= 0) {
       // Only retain a press during descent; never grant an extra mid-air jump.
       if (this.cat.vy > 0) this.jumpBufferRemaining = PHYSICS.jumpBufferSeconds;
@@ -82,8 +88,9 @@ export class GameSession {
   }
 
   update(deltaSeconds: number): boolean {
+    if (this.failureReason !== null) return true;
     const delta = Math.max(0, Math.min(deltaSeconds, PHYSICS.maxFrameDelta));
-    const difficulty = getDifficulty(this.score);
+    const difficulty = getDifficulty(this.score - this.collectedCount * ROOF_FEATURES.rewardPoints);
     if (this.cat.grounded && this.jumpBufferRemaining > 0) this.jump();
     this.jumpBufferRemaining = Math.max(0, this.jumpBufferRemaining - delta);
     this.coyoteRemaining = Math.max(0, this.coyoteRemaining - delta);
@@ -110,10 +117,12 @@ export class GameSession {
       this.resolveLanding();
     }
 
+    if (this.resolveFeatures()) return true;
+
     this.score = Math.max(
       this.score,
       Math.floor(Math.max(0, this.cat.x - 70) / SCORE.distancePixelsPerPoint) +
-        this.landingBonus,
+        this.landingBonus + this.collectedCount * ROOF_FEATURES.rewardPoints,
     );
 
     const horizontalLead = Math.max(CAMERA.horizontalLead, this.viewWidth * 0.28);
@@ -127,10 +136,10 @@ export class GameSession {
     this.fillPlatforms();
     this.prunePlatforms();
 
-    return (
-      this.cat.y > this.cameraY + GAME_HEIGHT + 80 ||
-      this.cat.x + this.cat.width < this.cameraX - 40
-    );
+    const lost = this.cat.y > this.cameraY + GAME_HEIGHT + 80 ||
+      this.cat.x + this.cat.width < this.cameraX - 40;
+    if (lost) this.failureReason = "fall";
+    return lost;
   }
 
   snapshot(): WorldSnapshot {
@@ -141,7 +150,28 @@ export class GameSession {
       cameraY: this.cameraY,
       score: this.score,
       seed: this.seed,
+      collectedCount: this.collectedCount,
+      failureReason: this.failureReason,
     };
+  }
+
+  private resolveFeatures(): boolean {
+    for (const platform of this.platforms) {
+      if (platform.hazard && sweptCatIntersects(this.cat, platform.hazard)) {
+        this.failureReason = "hazard";
+        this.clearPendingInput();
+        return true;
+      }
+    }
+    for (const platform of this.platforms) {
+      for (const reward of platform.rewards ?? []) {
+        if (!reward.collected && sweptCatIntersects(this.cat, reward)) {
+          reward.collected = true;
+          this.collectedCount += 1;
+        }
+      }
+    }
+    return false;
   }
 
   private createCat(): Cat {

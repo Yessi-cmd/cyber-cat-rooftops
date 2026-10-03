@@ -9,6 +9,11 @@ describe("office palette hierarchy", () => {
     expect(contrastRatio(PALETTE.warmYellow, PALETTE.violetDark)).toBeGreaterThan(4.5);
   });
 
+  it("路障和鱼干在浅底有明确对比", () => {
+    expect(contrastRatio(PALETTE.hazard, PALETTE.night)).toBeGreaterThan(4);
+    expect(contrastRatio(PALETTE.reward, PALETTE.night)).toBeGreaterThan(4);
+  });
+
   it("远景与天空保持低对比，避免伪装成平台", () => {
     expect(contrastRatio(PALETTE.violetDark, PALETTE.night)).toBeLessThan(1.5);
     expect(contrastRatio(PALETTE.nightLift, PALETTE.night)).toBeLessThan(1.2);

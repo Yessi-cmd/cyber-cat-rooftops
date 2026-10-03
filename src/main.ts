@@ -28,6 +28,9 @@ class GameApp {
   private readonly primaryButton = requiredElement<HTMLButtonElement>("#primary-button");
   private readonly pauseButton = requiredElement<HTMLButtonElement>("#pause-button");
   private readonly soundButton = requiredElement<HTMLButtonElement>("#sound-button");
+  private readonly lootElement = requiredElement<HTMLElement>("#loot-count");
+  private displayedLoot = -1;
+  private lastCollectedCount = 0;
   private readonly scoreElement = requiredElement<HTMLElement>("#score");
   private readonly liveStatus = requiredElement<HTMLElement>("#live-status");
   private readonly stateMachine = new GameStateMachine();
@@ -98,6 +101,10 @@ class GameApp {
     if (snapshot.score !== this.displayedScore) {
       this.displayedScore = snapshot.score;
       this.scoreElement.textContent = snapshot.score.toString().padStart(4, "0");
+    }
+    if (snapshot.collectedCount !== this.displayedLoot) {
+      this.displayedLoot = snapshot.collectedCount;
+      this.lootElement.textContent = CONTENT.loot(snapshot.collectedCount);
     }
     this.renderer.draw(snapshot, this.stateMachine.state, this.reducedMotion.matches);
     this.frameId = requestAnimationFrame(this.tick);
@@ -210,6 +217,7 @@ class GameApp {
     this.session.reset(this.createSeed());
     this.lastGrounded = true;
     this.lastJumpCount = 0;
+    this.lastCollectedCount = 0;
     this.lastPlatformId = 0;
     this.audio.setAmbientActive(true);
     if (jumpImmediately) {
@@ -242,7 +250,11 @@ class GameApp {
     if (state === "gameOver") {
       const score = this.session.snapshot().score;
       this.result.hidden = false;
-      this.result.textContent = CONTENT.result(score, this.bestScore);
+      this.result.textContent = CONTENT.result(score, this.bestScore) +
+        " · " + CONTENT.loot(this.session.snapshot().collectedCount);
+      if (this.session.snapshot().failureReason === "hazard") {
+        this.overlayCopy.textContent = CONTENT.hazardFailure;
+      }
     }
   }
 
@@ -261,7 +273,10 @@ class GameApp {
 
   private playWorldCues(): void {
     this.playJumpCue();
-    const cat = this.session.snapshot().cat;
+    const snapshot = this.session.snapshot();
+    if (snapshot.collectedCount > this.lastCollectedCount) this.audio.play("collect");
+    this.lastCollectedCount = snapshot.collectedCount;
+    const cat = snapshot.cat;
     if (!this.lastGrounded && cat.grounded) {
       this.renderer.triggerLanding();
       this.audio.play("land");

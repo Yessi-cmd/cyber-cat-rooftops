@@ -1,4 +1,6 @@
 export const PALETTE = {
+  hazard: "#a24f45",
+  reward: "#916b20",
   ink: "#26372e",
   night: "#f4f5f3",
   nightLift: "#e7eae6",

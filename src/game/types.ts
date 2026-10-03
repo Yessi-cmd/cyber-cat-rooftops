@@ -13,12 +13,25 @@ export interface Cat {
   platformId: number | null;
 }
 
+export interface WorldRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface Reward extends WorldRect {
+  collected: boolean;
+}
+
 export interface Platform {
   id: number;
   x: number;
   y: number;
   width: number;
   height: number;
+  hazard?: WorldRect;
+  rewards?: Reward[];
 }
 
 export interface WorldSnapshot {
@@ -28,4 +41,6 @@ export interface WorldSnapshot {
   cameraY: number;
   score: number;
   seed: number;
+  collectedCount: number;
+  failureReason: "fall" | "hazard" | null;
 }
