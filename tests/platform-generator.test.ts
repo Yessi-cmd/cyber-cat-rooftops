@@ -11,7 +11,7 @@ import type { Platform } from "../src/game/types";
 const start: Platform = { id: 0, x: 0, y: 620, width: 260, height: 42 };
 
 describe("PlatformGenerator", () => {
-  it("初级同高度跳跃窗口保持在约四分之一秒以上", () => {
+  it("初级同高度起跳窗口约170毫秒，后期平台停留时间明显缩短", () => {
     const difficulty = getDifficulty(0);
     const flightTime = descendingFlightTime(0);
     expect(flightTime).not.toBeNull();
@@ -21,8 +21,11 @@ describe("PlatformGenerator", () => {
 
     const shortestWindow =
       (flightTime * difficulty.runSpeed - difficulty.maxGap) / difficulty.runSpeed;
-    expect(shortestWindow).toBeGreaterThanOrEqual(0.24);
-    expect(shortestWindow).toBeLessThan(0.4);
+    expect(shortestWindow).toBeGreaterThanOrEqual(0.16);
+    expect(shortestWindow).toBeLessThan(0.2);
+    const expert = getDifficulty(500);
+    expect(expert.maxWidth / expert.runSpeed).toBeLessThan(0.47);
+    expect(expert.runSpeed).toBeGreaterThan(difficulty.runSpeed * 1.3);
   });
 
   it("同一随机种子生成同一序列", () => {

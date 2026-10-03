@@ -1,4 +1,4 @@
-import { PHYSICS, getDifficulty } from "./config";
+import { MIN_ROOF_WORLD_Y, PHYSICS, getDifficulty } from "./config";
 import { SeededRandom } from "./random";
 import type { Platform } from "./types";
 
@@ -67,12 +67,14 @@ export class PlatformGenerator {
       const candidate: Platform = {
         id: this.nextId,
         x: previous.x + previous.width + gap,
-        y: previous.y + yOffset,
+        y: Math.max(MIN_ROOF_WORLD_Y, previous.y + yOffset),
         width: Math.round(this.random.between(difficulty.minWidth, difficulty.maxWidth)),
         height: 36,
       };
 
       if (
+        // Lookahead can cross a score threshold before the runner does.
+        isPlatformReachableAtSpeed(previous, candidate, PHYSICS.runSpeed) &&
         isPlatformReachableAtSpeed(previous, candidate, difficulty.runSpeed) &&
         !isPlatformReachableWithoutJump(previous, candidate, difficulty.runSpeed)
       ) {

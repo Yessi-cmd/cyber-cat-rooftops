@@ -38,10 +38,12 @@ class GameApp {
   private readonly audio = new AudioController(this.initialSave.muted);
   private bestScore = this.initialSave.bestScore;
   private lastGrounded = true;
+  private lastJumpCount = 0;
   private lastPlatformId = 0;
   private frameId: number | null = null;
   private previousTime = performance.now();
   private accumulator = 0;
+  private displayedScore = -1;
 
   constructor() {
     for (const [key, text] of Object.entries(CONTENT.document)) {
@@ -93,7 +95,10 @@ class GameApp {
     }
 
     const snapshot = this.session.snapshot();
-    this.scoreElement.textContent = snapshot.score.toString().padStart(4, "0");
+    if (snapshot.score !== this.displayedScore) {
+      this.displayedScore = snapshot.score;
+      this.scoreElement.textContent = snapshot.score.toString().padStart(4, "0");
+    }
     this.renderer.draw(snapshot, this.stateMachine.state, this.reducedMotion.matches);
     this.frameId = requestAnimationFrame(this.tick);
   };
@@ -117,7 +122,7 @@ class GameApp {
         break;
       case "playing":
         this.jump();
-        break;
+        return;
       case "gameOver":
         this.restart(true);
         break;
@@ -166,6 +171,7 @@ class GameApp {
       return;
     }
     this.stateMachine.send("pause");
+    this.session.clearPendingInput();
     this.audio.setAmbientActive(false);
     this.liveStatus.textContent = CONTENT.live.paused;
     this.renderUi();
@@ -203,6 +209,7 @@ class GameApp {
     }
     this.session.reset(this.createSeed());
     this.lastGrounded = true;
+    this.lastJumpCount = 0;
     this.lastPlatformId = 0;
     this.audio.setAmbientActive(true);
     if (jumpImmediately) {
@@ -240,13 +247,20 @@ class GameApp {
   }
 
   private jump(): void {
-    if (this.session.jump()) {
+    this.session.jump();
+    this.playJumpCue();
+  }
+
+  private playJumpCue(): void {
+    if (this.session.jumpCount !== this.lastJumpCount) {
+      this.lastJumpCount = this.session.jumpCount;
       this.lastGrounded = false;
       this.audio.play("jump");
     }
   }
 
   private playWorldCues(): void {
+    this.playJumpCue();
     const cat = this.session.snapshot().cat;
     if (!this.lastGrounded && cat.grounded) {
       this.renderer.triggerLanding();

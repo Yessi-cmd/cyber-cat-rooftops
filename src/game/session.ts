@@ -17,10 +17,22 @@ export class GameSession {
   private platforms: Platform[] = [{ ...START_PLATFORM }];
   private cameraX = 0;
   private cameraY = 0;
+  private cameraTargetY = 0;
   private score = 0;
   private landingBonus = 0;
   private furthestPlatformId = START_PLATFORM.id;
   private viewWidth = GAME_WIDTH;
+  private coyoteRemaining = 0;
+  private jumpBufferRemaining = 0;
+  private jumps = 0;
+
+  get jumpCount(): number {
+    return this.jumps;
+  }
+
+  clearPendingInput(): void {
+    this.jumpBufferRemaining = 0;
+  }
 
   constructor(seed = 1) {
     this.reset(seed);
@@ -33,17 +45,26 @@ export class GameSession {
     this.platforms = [{ ...START_PLATFORM }];
     this.cameraX = 0;
     this.cameraY = 0;
+    this.cameraTargetY = 0;
     this.score = 0;
+    this.coyoteRemaining = 0;
+    this.jumpBufferRemaining = 0;
+    this.jumps = 0;
     this.landingBonus = 0;
     this.furthestPlatformId = START_PLATFORM.id;
     this.fillPlatforms();
   }
 
   jump(): boolean {
-    if (!this.cat.grounded) {
+    if (!this.cat.grounded && this.coyoteRemaining <= 0) {
+      // Only retain a press during descent; never grant an extra mid-air jump.
+      if (this.cat.vy > 0) this.jumpBufferRemaining = PHYSICS.jumpBufferSeconds;
       return false;
     }
 
+    this.coyoteRemaining = 0;
+    this.jumpBufferRemaining = 0;
+    this.jumps += 1;
     this.cat.grounded = false;
     this.cat.platformId = null;
     this.cat.vy = PHYSICS.jumpVelocity;
@@ -54,19 +75,25 @@ export class GameSession {
     if (!Number.isFinite(width)) {
       return;
     }
-    this.viewWidth = Math.max(GAME_WIDTH, Math.round(width));
+    const nextWidth = Math.max(GAME_WIDTH, Math.round(width));
+    if (nextWidth === this.viewWidth) return;
+    this.viewWidth = nextWidth;
     this.fillPlatforms();
   }
 
   update(deltaSeconds: number): boolean {
     const delta = Math.max(0, Math.min(deltaSeconds, PHYSICS.maxFrameDelta));
     const difficulty = getDifficulty(this.score);
+    if (this.cat.grounded && this.jumpBufferRemaining > 0) this.jump();
+    this.jumpBufferRemaining = Math.max(0, this.jumpBufferRemaining - delta);
+    this.coyoteRemaining = Math.max(0, this.coyoteRemaining - delta);
     this.cat.vx = difficulty.runSpeed;
     this.cat.previousX = this.cat.x;
     this.cat.previousY = this.cat.y;
     this.cat.x += this.cat.vx * delta;
 
     if (this.cat.grounded && !this.isSupported()) {
+      this.coyoteRemaining = PHYSICS.coyoteSeconds;
       this.cat.grounded = false;
       this.cat.platformId = null;
     }
@@ -91,10 +118,10 @@ export class GameSession {
 
     const horizontalLead = Math.max(CAMERA.horizontalLead, this.viewWidth * 0.28);
     this.cameraX = Math.max(this.cameraX, this.cat.x - horizontalLead);
-    const groundedCameraTarget = this.cat.grounded
-      ? Math.max(this.cameraY, this.cat.y - CAMERA.verticalLead)
-      : this.cameraY;
-    const cameraDistance = groundedCameraTarget - this.cameraY;
+    if (this.cat.grounded) {
+      this.cameraTargetY = Math.max(this.cameraTargetY, this.cat.y - CAMERA.verticalLead);
+    }
+    const cameraDistance = this.cameraTargetY - this.cameraY;
     this.cameraY += Math.min(cameraDistance, difficulty.scrollSpeed * delta);
 
     this.fillPlatforms();
@@ -153,7 +180,7 @@ export class GameSession {
     }
 
     for (const platform of this.platforms) {
-      if (previousBottom > platform.y || currentBottom < platform.y) {
+      if (previousBottom >= platform.y || currentBottom < platform.y) {
         continue;
       }
 
@@ -198,8 +225,11 @@ export class GameSession {
 
   private prunePlatforms(): void {
     const cutoff = this.cameraX - this.viewWidth * 0.5;
-    this.platforms = this.platforms.filter(
-      (platform) => platform.x + platform.width >= cutoff || platform.id === this.cat.platformId,
-    );
+    let removeCount = 0;
+    for (const platform of this.platforms) {
+      if (platform.x + platform.width >= cutoff || platform.id === this.cat.platformId) break;
+      removeCount += 1;
+    }
+    if (removeCount > 0) this.platforms.splice(0, removeCount);
   }
 }

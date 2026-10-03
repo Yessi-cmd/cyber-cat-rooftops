@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PHYSICS } from "../src/game/config";
 import { descendingFlightTime } from "../src/game/platform-generator";
 import { GameSession } from "../src/game/session";
-import type { WorldSnapshot } from "../src/game/types";
+import type { Cat, WorldSnapshot } from "../src/game/types";
 
 function playIdealSession(
   seed: number,
@@ -38,6 +38,59 @@ function playIdealSession(
 }
 
 describe("GameSession", () => {
+  it("离边60毫秒内仍可起跳，起跳后不能二段跳", () => {
+    const session = new GameSession(1);
+    const cat = session.snapshot().cat as Cat;
+    cat.x = 259;
+    session.update(PHYSICS.fixedStep);
+    expect(cat.grounded).toBe(false);
+    expect(session.jump()).toBe(true);
+    expect(cat.vy).toBe(PHYSICS.jumpVelocity);
+    expect(session.jump()).toBe(false);
+    expect(session.jumpCount).toBe(1);
+  });
+
+  it("离边容错超时后不能在空中补跳", () => {
+    const session = new GameSession(1);
+    (session.snapshot().cat as Cat).x = 259;
+    for (let frame = 0; frame < 10; frame += 1) session.update(PHYSICS.fixedStep);
+    expect(session.jump()).toBe(false);
+    expect(session.jumpCount).toBe(0);
+  });
+
+  it("落地前按键保留100毫秒，只在落地后起跳一次", () => {
+    const session = new GameSession(1);
+    const cat = session.snapshot().cat as Cat;
+    cat.grounded = false;
+    cat.platformId = null;
+    cat.y = 591;
+    cat.vy = 100;
+    expect(session.jump()).toBe(false);
+    for (let frame = 0; frame < 4; frame += 1) session.update(PHYSICS.fixedStep);
+    expect(cat.grounded).toBe(false);
+    expect(cat.vy).toBeLessThan(0);
+    expect(session.jumpCount).toBe(1);
+    for (let frame = 0; frame < 65; frame += 1) session.update(PHYSICS.fixedStep);
+    expect(session.jumpCount).toBe(1);
+  });
+
+  it("过早输入会过期，暂停清理和重开也清除待执行跳跃", () => {
+    for (const clear of ["expire", "pause", "reset"]) {
+      const session = new GameSession(1);
+      let cat = session.snapshot().cat as Cat;
+      cat.grounded = false;
+      cat.platformId = null;
+      cat.y = clear === "expire" ? 540 : 591;
+      cat.vy = 100;
+      session.jump();
+      if (clear === "pause") session.clearPendingInput();
+      if (clear === "reset") { session.reset(1); cat = session.snapshot().cat; }
+      for (let frame = 0; frame < 35; frame += 1) session.update(PHYSICS.fixedStep);
+      expect(session.jumpCount, clear).toBe(0);
+      expect(cat.grounded, clear).toBe(true);
+    }
+  });
+
   it("同种子同输入在手机、桌面及中途缩放时保持相同规则结果", () => {
     for (const seed of [1, 42, 20260718]) {
       const phone = new GameSession(seed);
@@ -120,6 +173,18 @@ describe("GameSession", () => {
     expect(session.snapshot().cat.vy).toBe(0);
   });
 
+  it("盲目每100毫秒连点无法稳定通过前30秒", () => {
+    let failedRounds = 0;
+    for (let seed = 1; seed <= 100; seed += 1) {
+      const session = new GameSession(seed);
+      for (let step = 0; step < 30 / PHYSICS.fixedStep; step += 1) {
+        if (step % 12 === 0) session.jump();
+        if (session.update(PHYSICS.fixedStep)) { failedRounds += 1; break; }
+      }
+    }
+    expect(failedRounds).toBeGreaterThanOrEqual(90);
+  });
+
   it("不跳跃会在第一个楼顶后落空", () => {
     const session = new GameSession(17);
     let lost = false;
@@ -153,11 +218,11 @@ describe("GameSession", () => {
   });
 
   it("多种长局面中相机都不会脱离可玩楼顶", () => {
-    for (let seed = 1; seed <= 50; seed += 1) {
+    for (let seed = 1; seed <= 300; seed += 1) {
       const { lost, snapshot } = playIdealSession(seed, 60, 390);
       const catScreenY = snapshot.cat.y - snapshot.cameraY;
 
-      expect(lost, `seed=${seed}`).toBe(false);
+      expect(lost, `seed=${seed} ${JSON.stringify(snapshot)}`).toBe(false);
       expect(catScreenY, `seed=${seed}`).toBeGreaterThan(260);
       expect(catScreenY, `seed=${seed}`).toBeLessThan(760);
     }
