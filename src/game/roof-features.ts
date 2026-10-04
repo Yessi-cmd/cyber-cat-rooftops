@@ -20,7 +20,7 @@ export function addRoofFeatures(previous: Platform, platform: Platform, hazardRo
   };
 
   const gapCenter = (previous.x + previous.width + platform.x) / 2;
-  addReward(gapCenter, Math.min(previous.y, platform.y) - 54);
+  addReward(gapCenter, Math.min(previous.y, platform.y) - 112);
 
   if (hazardRoof) {
     const x = platform.x + ROOF_FEATURES.hazardOffset + (platform.id % 3) * 12;

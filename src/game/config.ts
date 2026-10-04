@@ -7,6 +7,7 @@ export const PHYSICS = {
   // Logical px/s and px/s²; shorter flight keeps each press crisp.
   runSpeed: 200,
   jumpVelocity: -420,
+  maxJumps: 2,
   gravity: 1500,
   // Seconds: forgive near-landing presses and very late edge jumps.
   jumpBufferSeconds: 0.1,
@@ -54,8 +55,8 @@ export interface Difficulty {
 export function getDifficulty(score: number): Difficulty {
   if (score < 150) {
     return {
-      minGap: 62,
-      maxGap: 78,
+      minGap: 142,
+      maxGap: 170,
       minYOffset: -12,
       maxYOffset: 12,
       minWidth: 125,
@@ -67,8 +68,8 @@ export function getDifficulty(score: number): Difficulty {
 
   if (score < 500) {
     return {
-      minGap: 74,
-      maxGap: 96,
+      minGap: 174,
+      maxGap: 198,
       minYOffset: -22,
       maxYOffset: 28,
       minWidth: 100,
@@ -79,8 +80,8 @@ export function getDifficulty(score: number): Difficulty {
   }
 
   return {
-    minGap: 84,
-    maxGap: 110,
+    minGap: 206,
+    maxGap: 230,
     minYOffset: -30,
     maxYOffset: 40,
     minWidth: 80,

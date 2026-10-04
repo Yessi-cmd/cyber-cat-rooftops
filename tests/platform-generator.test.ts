@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getDifficulty } from "../src/game/config";
 import {
   descendingFlightTime,
+  doubleJumpFlightTime,
   PlatformGenerator,
   isPlatformReachableAtSpeed,
   isPlatformReachableWithoutJump,
@@ -11,9 +12,9 @@ import type { Platform } from "../src/game/types";
 const start: Platform = { id: 0, x: 0, y: 620, width: 260, height: 42 };
 
 describe("PlatformGenerator", () => {
-  it("初级同高度起跳窗口约170毫秒，后期平台停留时间明显缩短", () => {
+  it("楼距超过单跳范围，二段跳保留明确余量，后期平台更短", () => {
     const difficulty = getDifficulty(0);
-    const flightTime = descendingFlightTime(0);
+    const flightTime = doubleJumpFlightTime(0);
     expect(flightTime).not.toBeNull();
     if (flightTime === null) {
       return;
@@ -21,8 +22,9 @@ describe("PlatformGenerator", () => {
 
     const shortestWindow =
       (flightTime * difficulty.runSpeed - difficulty.maxGap) / difficulty.runSpeed;
-    expect(shortestWindow).toBeGreaterThanOrEqual(0.16);
-    expect(shortestWindow).toBeLessThan(0.2);
+    expect(shortestWindow).toBeGreaterThanOrEqual(0.09);
+    expect(shortestWindow).toBeLessThan(0.15);
+    expect(difficulty.minGap).toBeGreaterThan(descendingFlightTime(0)! * difficulty.runSpeed + 24);
     const expert = getDifficulty(500);
     expect(expert.maxWidth / expert.runSpeed).toBeLessThan(0.47);
     expect(expert.runSpeed).toBeGreaterThan(difficulty.runSpeed * 1.3);

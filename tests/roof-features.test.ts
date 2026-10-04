@@ -40,7 +40,7 @@ describe("roof hazards and rewards", () => {
 
   it("扫掠判定捕捉一帧跨过的障碍，跃过上方不误判", () => {
     const cat: Cat = { x: 120, previousX: 0, y: 580, previousY: 580,
-      width: 24, height: 28, vx: 1000, vy: 0, grounded: false, platformId: null };
+      width: 24, height: 28, vx: 1000, vy: 0, grounded: false, jumpsRemaining: 0, platformId: null };
     const barrier = { x: 60, y: 600, width: 8, height: 20 };
     expect(sweptCatIntersects(cat, barrier)).toBe(true);
     cat.y = cat.previousY = 570;

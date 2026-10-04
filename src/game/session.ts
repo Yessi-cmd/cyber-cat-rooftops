@@ -62,8 +62,8 @@ export class GameSession {
 
   jump(): boolean {
     if (this.failureReason !== null) return false;
-    if (!this.cat.grounded && this.coyoteRemaining <= 0) {
-      // Only retain a press during descent; never grant an extra mid-air jump.
+    if (this.cat.jumpsRemaining <= 0) {
+      // With both jumps spent, only a near-landing press may be buffered.
       if (this.cat.vy > 0) this.jumpBufferRemaining = PHYSICS.jumpBufferSeconds;
       return false;
     }
@@ -71,6 +71,7 @@ export class GameSession {
     this.coyoteRemaining = 0;
     this.jumpBufferRemaining = 0;
     this.jumps += 1;
+    this.cat.jumpsRemaining -= 1;
     this.cat.grounded = false;
     this.cat.platformId = null;
     this.cat.vy = PHYSICS.jumpVelocity;
@@ -94,6 +95,10 @@ export class GameSession {
     if (this.cat.grounded && this.jumpBufferRemaining > 0) this.jump();
     this.jumpBufferRemaining = Math.max(0, this.jumpBufferRemaining - delta);
     this.coyoteRemaining = Math.max(0, this.coyoteRemaining - delta);
+    if (!this.cat.grounded && this.coyoteRemaining <= 0) {
+      // Walking off spends the ground jump; keep one recovery jump.
+      this.cat.jumpsRemaining = Math.min(1, this.cat.jumpsRemaining);
+    }
     this.cat.vx = difficulty.runSpeed;
     this.cat.previousX = this.cat.x;
     this.cat.previousY = this.cat.y;
@@ -185,6 +190,7 @@ export class GameSession {
       vx: PHYSICS.runSpeed,
       vy: 0,
       grounded: true,
+      jumpsRemaining: PHYSICS.maxJumps,
       platformId: START_PLATFORM.id,
     };
   }
@@ -226,6 +232,7 @@ export class GameSession {
       this.cat.y = platform.y - this.cat.height;
       this.cat.vy = 0;
       this.cat.grounded = true;
+      this.cat.jumpsRemaining = PHYSICS.maxJumps;
       this.cat.platformId = platform.id;
       if (platform.id > this.furthestPlatformId) {
         this.landingBonus += SCORE.landingBonus;

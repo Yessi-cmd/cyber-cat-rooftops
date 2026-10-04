@@ -332,4 +332,4 @@ h1 {
 }
 
 .score-group { display: grid; gap: 3px; }
-#loot-count { padding-inline: 8px; color: #71531a; font: 12px/1.3 ui-sans-serif, system-ui, sans-serif; letter-spacing: 0; }
+#jump-count, #loot-count { padding-inline: 8px; color: #71531a; font: 12px/1.3 ui-sans-serif, system-ui, sans-serif; letter-spacing: 0; }

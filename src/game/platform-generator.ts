@@ -14,6 +14,14 @@ export function descendingFlightTime(yOffset: number): number | null {
   return (-PHYSICS.jumpVelocity + Math.sqrt(discriminant)) / PHYSICS.gravity;
 }
 
+// Conservative route: second press at the first apex, not late fall.
+export function doubleJumpFlightTime(yOffset: number): number | null {
+  const apexTime = -PHYSICS.jumpVelocity / PHYSICS.gravity;
+  const apexOffset = -(PHYSICS.jumpVelocity ** 2) / (2 * PHYSICS.gravity);
+  const secondFlight = descendingFlightTime(yOffset - apexOffset);
+  return secondFlight === null ? null : apexTime + secondFlight;
+}
+
 export function isPlatformReachable(from: Platform, to: Platform): boolean {
   return isPlatformReachableAtSpeed(from, to, PHYSICS.runSpeed);
 }
@@ -23,7 +31,7 @@ export function isPlatformReachableAtSpeed(
   to: Platform,
   runSpeed: number,
 ): boolean {
-  const time = descendingFlightTime(to.y - from.y);
+  const time = doubleJumpFlightTime(to.y - from.y);
   if (time === null) {
     return false;
   }
@@ -77,8 +85,7 @@ export class PlatformGenerator {
       };
 
       if (
-        // Lookahead can cross a score threshold before the runner does.
-        isPlatformReachableAtSpeed(previous, candidate, PHYSICS.runSpeed) &&
+        // Progress is estimated at the departure roof, independently of lookahead.
         isPlatformReachableAtSpeed(previous, candidate, difficulty.runSpeed) &&
         !isPlatformReachableWithoutJump(previous, candidate, difficulty.runSpeed)
       ) {

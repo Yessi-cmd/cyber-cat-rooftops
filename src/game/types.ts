@@ -10,6 +10,7 @@ export interface Cat {
   vx: number;
   vy: number;
   grounded: boolean;
+  jumpsRemaining: number;
   platformId: number | null;
 }
 

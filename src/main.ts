@@ -29,6 +29,8 @@ class GameApp {
   private readonly pauseButton = requiredElement<HTMLButtonElement>("#pause-button");
   private readonly soundButton = requiredElement<HTMLButtonElement>("#sound-button");
   private readonly lootElement = requiredElement<HTMLElement>("#loot-count");
+  private readonly jumpElement = requiredElement<HTMLElement>("#jump-count");
+  private displayedJumps = -1;
   private displayedLoot = -1;
   private lastCollectedCount = 0;
   private readonly scoreElement = requiredElement<HTMLElement>("#score");
@@ -52,6 +54,7 @@ class GameApp {
     for (const [key, text] of Object.entries(CONTENT.document)) {
       requiredElement<HTMLElement>(`[data-document="${key}"]`).textContent = text;
     }
+    requiredElement<HTMLElement>(".desktop-help").textContent = CONTENT.controls;
     this.session.setViewWidth(this.renderer.viewWidth);
     new InputController(this.shell, this.canvas, this.handleInput);
     this.primaryButton.addEventListener("click", this.handlePrimaryClick);
@@ -101,6 +104,10 @@ class GameApp {
     if (snapshot.score !== this.displayedScore) {
       this.displayedScore = snapshot.score;
       this.scoreElement.textContent = snapshot.score.toString().padStart(4, "0");
+    }
+    if (snapshot.cat.jumpsRemaining !== this.displayedJumps) {
+      this.displayedJumps = snapshot.cat.jumpsRemaining;
+      this.jumpElement.textContent = CONTENT.jumps(this.displayedJumps);
     }
     if (snapshot.collectedCount !== this.displayedLoot) {
       this.displayedLoot = snapshot.collectedCount;

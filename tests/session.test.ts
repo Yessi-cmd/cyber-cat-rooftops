@@ -24,7 +24,46 @@ function playIdealSession(
 }
 
 describe("GameSession", () => {
-  it("离边60毫秒内仍可起跳，起跳后不能二段跳", () => {
+  it("二段跳重置上升速度，第三次无效，落地与重开恢复次数", () => {
+    const session = new GameSession(19);
+    const cat = session.snapshot().cat;
+    expect(cat.jumpsRemaining).toBe(2);
+    session.jump();
+    for (let frame = 0; frame < 20; frame += 1) session.update(PHYSICS.fixedStep);
+    expect(cat.vy).toBeGreaterThan(PHYSICS.jumpVelocity);
+    expect(session.jump()).toBe(true);
+    expect(cat.vy).toBe(PHYSICS.jumpVelocity);
+    expect(cat.jumpsRemaining).toBe(0);
+    expect(session.jump()).toBe(false);
+    session.clearPendingInput();
+    expect(cat.jumpsRemaining).toBe(0);
+    for (let frame = 0; frame < 85; frame += 1) session.update(PHYSICS.fixedStep);
+    expect(cat.grounded).toBe(true);
+    expect(cat.jumpsRemaining).toBe(2);
+    session.jump();
+    session.reset(19);
+    expect(session.snapshot().cat.jumpsRemaining).toBe(2);
+  });
+
+  it("远间隙单跳会落空，顶点二段跳可以跨越并恢复次数", () => {
+    for (const useSecondJump of [false, true]) {
+      const session = new GameSession(42);
+      const cat = session.snapshot().cat as Cat;
+      cat.x = 240;
+      session.jump();
+      for (let frame = 0; frame < 34; frame += 1) session.update(PHYSICS.fixedStep);
+      if (useSecondJump) session.jump();
+      let landed = false;
+      for (let frame = 0; frame < 100; frame += 1) {
+        if (session.update(PHYSICS.fixedStep)) break;
+        if (cat.grounded && cat.platformId === 1) { landed = true; break; }
+      }
+      expect(landed).toBe(useSecondJump);
+      if (landed) expect(cat.jumpsRemaining).toBe(2);
+    }
+  });
+
+  it("离边60毫秒内仍可起跳，随后仅允许一次二段跳", () => {
     const session = new GameSession(1);
     const cat = session.snapshot().cat as Cat;
     cat.x = 259;
@@ -32,21 +71,25 @@ describe("GameSession", () => {
     expect(cat.grounded).toBe(false);
     expect(session.jump()).toBe(true);
     expect(cat.vy).toBe(PHYSICS.jumpVelocity);
+    expect(session.jump()).toBe(true);
     expect(session.jump()).toBe(false);
-    expect(session.jumpCount).toBe(1);
+    expect(session.jumpCount).toBe(2);
   });
 
-  it("离边容错超时后不能在空中补跳", () => {
+  it("离边容错超时后只保留一次空中补跳", () => {
     const session = new GameSession(1);
     (session.snapshot().cat as Cat).x = 259;
     for (let frame = 0; frame < 10; frame += 1) session.update(PHYSICS.fixedStep);
+    expect(session.snapshot().cat.jumpsRemaining).toBe(1);
+    expect(session.jump()).toBe(true);
     expect(session.jump()).toBe(false);
-    expect(session.jumpCount).toBe(0);
+    expect(session.jumpCount).toBe(1);
   });
 
   it("落地前按键保留100毫秒，只在落地后起跳一次", () => {
     const session = new GameSession(1);
     const cat = session.snapshot().cat as Cat;
+    cat.jumpsRemaining = 0;
     cat.grounded = false;
     cat.platformId = null;
     cat.y = 591;
@@ -64,6 +107,7 @@ describe("GameSession", () => {
     for (const clear of ["expire", "pause", "reset"]) {
       const session = new GameSession(1);
       let cat = session.snapshot().cat as Cat;
+      cat.jumpsRemaining = 0;
       cat.grounded = false;
       cat.platformId = null;
       cat.y = clear === "expire" ? 540 : 591;
@@ -143,7 +187,6 @@ describe("GameSession", () => {
   it("起跳后能从上方重新落到平台", () => {
     const session = new GameSession(7);
     expect(session.jump()).toBe(true);
-    expect(session.jump()).toBe(false);
 
     for (let index = 0; index < 100; index += 1) {
       session.update(PHYSICS.fixedStep);
@@ -203,7 +246,8 @@ describe("GameSession", () => {
       const catScreenY = snapshot.cat.y - snapshot.cameraY;
 
       expect(lost, `seed=${seed} ${JSON.stringify(snapshot)}`).toBe(false);
-      expect(catScreenY, `seed=${seed}`).toBeGreaterThan(260);
+      // The second apex adds about 59 px of height relative to single-jump play.
+      expect(catScreenY, `seed=${seed}`).toBeGreaterThan(200);
       expect(catScreenY, `seed=${seed}`).toBeLessThan(760);
     }
   });

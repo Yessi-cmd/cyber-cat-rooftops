@@ -17,7 +17,7 @@ export const CONTENT = {
   overlay: {
     ready: {
       title: "赛博小猫跳楼顶",
-      copy: "轻触或空格跳跃，躲开红色路障，收集鱼干加分。",
+      copy: "轻触或空格起跳，空中再按一次二段跳；跨越远楼距，躲路障、捡鱼干。",
       action: "开始跳跃",
     },
     paused: {
@@ -45,6 +45,8 @@ export const CONTENT = {
     unmuted: "声音已开启",
     gameOver: (score: number): string => `游戏结束，本局 ${score} 分`,
   },
+  jumps: (count: number): string => `可跳 ${count}/2`,
+  controls: "空格 / ↑ / W 跳跃 · 空中再按二段跳 · P / Esc 暂停",
   loot: (count: number): string => `鱼干 × ${count}`,
   hazardFailure: "碰到路障了。提前起跳，越过条纹挡板。",
   result: (score: number, bestScore: number): string =>
