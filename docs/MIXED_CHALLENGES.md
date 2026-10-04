@@ -32,3 +32,9 @@
 - 手机真机 Safari/Android 和低端设备性能未复验。
 
 ![实玩中的预警和混合楼距](assets/mixed-gaps-warning.png)
+
+## 生产部署
+
+2026-10-04 09:10（Asia/Shanghai）部署 `9684e9c` 到 release `20261004T011010Z-9684e9cb27d6`。本机无 rsync，沿用 tar + SCP 上传，SHA-256 校验后解压到新版本目录，经 `current.next` → `current` 原子切换；未修改 DNS 或 Caddy 配置。服务器保留 5 个版本，上一版本 `20261004T005207Z-b203ffb9d33e` 可用于回滚。
+
+部署后核对：首页 `200`、`Cache-Control: no-cache`，引用的 `index-B4qH8OYC.js` 与本地构建一致，资源为一年 immutable 缓存并包含新预警文案。线上浏览器实玩和手机真机未复验。
