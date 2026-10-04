@@ -94,6 +94,40 @@ export const POWERS = {
   doubleSeconds: 8,
 } as const;
 
+// Late-stage enemies. Sizes in logical px; motion follows cat progress except
+// the laser, which blinks on simulation time.
+export const ENEMIES = {
+  introductions: { 15: "robot", 19: "laser", 23: "crow", 27: "pot" },
+  anchorAfterOffset: 20, // px past hazardOffsetAt() where an enemy sits
+  robotWidth: 26,
+  robotHeight: 18, // a short hop clears it
+  robotRange: 50, // patrols ±range around its anchor
+  robotPaceRatio: 0.35, // robot speed relative to the cat's run speed
+  stompTolerance: 6, // px of overlap still counted as landing on top
+  stompBounce: -420, // px/s
+  stompBonus: 30,
+  laserWidth: 6,
+  laserHeight: 52, // above a short hop, below a held jump
+  laserPeriod: 1.4, // s
+  laserOnFraction: 0.5,
+  laserWarnSeconds: 0.25, // emitters flash this long before switching on
+  crowWidth: 28,
+  crowHeight: 16,
+  crowSpeedRatio: 0.5,
+  crowDiveSlope: 0.7, // px of height per px of distance from the meeting point
+  crowMaxLift: 280,
+  crowCrossOffset: 40,
+  crowWarningDistance: 360,
+  potWidth: 16,
+  potHeight: 16,
+  potFallHeight: 240,
+  potFallDistance: 260, // cat px of approach while the pot falls
+  potLandDistance: 80, // lands this far ahead of the cat's centre
+  potShadowLead: 100,
+  shardWidth: 30,
+  shardHeight: 12,
+} as const;
+
 export const CAMERA = {
   horizontalLead: 112,
   verticalLead: 520,

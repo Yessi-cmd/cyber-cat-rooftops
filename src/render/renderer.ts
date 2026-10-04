@@ -1,5 +1,5 @@
 import { GAME_HEIGHT, GAME_WIDTH } from "../game/config";
-import type { Eagle, GameState, Hazard, PowerItem, WorldSnapshot, WorldRect } from "../game/types";
+import type { Eagle, Enemy, GameState, Hazard, PowerItem, WorldSnapshot, WorldRect } from "../game/types";
 
 // Render-only view of a race opponent (see src/net/race-controller.ts).
 export interface RaceGhost {
@@ -13,7 +13,7 @@ export interface RaceGhost {
 import { LAND_ANIMATION_DURATION_MS, selectCatPose, type CatPose } from "./cat-animation";
 import { EffectLayer } from "./effects";
 import { CAT_COATS, PALETTE, POWER_COLORS, type CatCoat } from "./palette";
-import { POWERS } from "../game/config";
+import { ENEMIES, POWERS } from "../game/config";
 import {
   getRoofDecorationOffset,
   hasVentSteam,
@@ -209,7 +209,7 @@ export class Renderer {
       }
 
       const decoration = selectRoofDecoration(platform.id, platform.width);
-      if (decoration !== "none" && !platform.hazard && !platform.eagle) {
+      if (decoration !== "none" && !platform.hazard && !platform.eagle && !platform.enemy) {
         const offset = getRoofDecorationOffset(platform.id, platform.width, decoration);
         this.drawRoofDecoration(
           decoration,
@@ -300,6 +300,9 @@ export class Renderer {
     for (const platform of snapshot.platforms) {
       if (platform.power && !platform.power.collected) {
         this.drawPowerItem(platform.power, snapshot.cameraX, snapshot.cameraY, reducedMotion, nowMs);
+      }
+      if (platform.enemy && !platform.enemy.broken) {
+        this.drawEnemy(platform.enemy, snapshot, reducedMotion, nowMs);
       }
       if (platform.eagle && !platform.eagle.broken) this.drawEagle(platform.eagle, snapshot.cameraX, snapshot.cameraY, reducedMotion, nowMs);
     }
@@ -562,6 +565,106 @@ export class Renderer {
       context.arc(x + 12, y + 14, 23, 0, Math.PI * 2);
       context.stroke();
       context.globalAlpha = 1;
+    }
+  }
+
+  private drawEnemy(enemy: Enemy, snapshot: WorldSnapshot, reducedMotion: boolean, nowMs: number): void {
+    const context = this.context;
+    const { cameraX, cameraY, cat } = snapshot;
+    const x = Math.round(enemy.x - cameraX);
+    const y = Math.round(enemy.y - cameraY);
+    const anchorX = Math.round(enemy.anchorX - cameraX);
+    const roofY = Math.round(enemy.roofY - cameraY);
+    if (anchorX < -320 || anchorX > this.logicalWidth + 320) return;
+    switch (enemy.kind) {
+      case "robot": {
+        // Boxy patrol bot: treads, body, antenna and a visor facing its heading.
+        const facingLeft = enemy.x + enemy.width / 2 > cat.x + cat.width / 2;
+        context.fillStyle = PALETTE.blackPurple;
+        context.fillRect(x, y + 13, 26, 5);
+        context.fillRect(x + 2, y + 3, 22, 11);
+        context.fillRect(x + 12, y - 3, 2, 6);
+        context.fillStyle = PALETTE.hazard;
+        context.fillRect(x + 4, y + 5, 18, 7);
+        context.fillRect(x + 11, y - 5, 4, 3);
+        context.fillStyle = PALETTE.catCream;
+        context.fillRect(facingLeft ? x + 5 : x + 15, y + 7, 6, 3);
+        const tread = reducedMotion ? 0 : Math.floor(nowMs / 90) % 2;
+        for (let wheel = 0; wheel < 4; wheel += 1) context.fillRect(x + 2 + wheel * 6 + tread, y + 15, 2, 2);
+        return;
+      }
+      case "laser": {
+        // Emitters stay visible; the beam is solid when lit, a faint dotted guide when off.
+        context.fillStyle = PALETTE.blackPurple;
+        context.fillRect(x - 4, y - 6, 14, 6);
+        context.fillRect(x - 4, roofY - 4, 14, 4);
+        if (enemy.active) {
+          context.fillStyle = PALETTE.hazard;
+          context.fillRect(x, y, enemy.width, enemy.height);
+          context.fillStyle = PALETTE.catCream;
+          context.fillRect(x + 2, y, 2, enemy.height);
+        } else {
+          context.fillStyle = PALETTE.hazard;
+          for (let dash = y; dash < roofY - 4; dash += 8) context.fillRect(x + 2, dash, 2, 3);
+          if (!reducedMotion && Math.floor(nowMs / 100) % 2 === 0) context.fillRect(x - 2, y - 4, 10, 2);
+        }
+        return;
+      }
+      case "crow": {
+        // Dashed dive path while it approaches, so the low point is readable early.
+        const ahead = enemy.anchorX - (cat.x + cat.width / 2);
+        if (ahead > 0 && ahead <= ENEMIES.crowWarningDistance) {
+          context.fillStyle = PALETTE.hazard;
+          const runningY = roofY - 14;
+          for (let offset = -120; offset <= 120; offset += 10) {
+            // World path of the crow centre: offset = ratio·d, lift = slope·|d|.
+            const lift = Math.min(ENEMIES.crowMaxLift, ENEMIES.crowDiveSlope * Math.abs(offset) / ENEMIES.crowSpeedRatio);
+            context.fillRect(anchorX + offset, Math.round(runningY - lift), 4, 2);
+          }
+        }
+        const wingUp = !reducedMotion && Math.floor(nowMs / 110) % 2 === 0;
+        context.fillStyle = PALETTE.blackPurple;
+        context.fillRect(x + 6, y + 5, 18, 7);
+        context.fillRect(x + 22, y + 6, 6, 4);
+        context.fillRect(x + 2, y + 4, 6, 6);
+        context.fillRect(x + 10, wingUp ? y : y + 11, 10, 4);
+        context.fillStyle = PALETTE.reward;
+        context.fillRect(x, y + 6, 3, 2);
+        context.fillStyle = PALETTE.hazard;
+        context.fillRect(x + 11, wingUp ? y + 1 : y + 12, 8, 2);
+        context.fillStyle = PALETTE.night;
+        context.fillRect(x + 4, y + 5, 2, 2);
+        return;
+      }
+      case "pot": {
+        if (!enemy.active) {
+          // Growing shadow on the roof marks where it will land.
+          const progress = 1 - Math.min(1, Math.max(0, (enemy.roofY - enemy.height - enemy.y) / ENEMIES.potFallHeight));
+          const width = Math.round(10 + progress * (ENEMIES.shardWidth - 10));
+          context.globalAlpha = 0.25 + progress * 0.35;
+          context.fillStyle = PALETTE.blackPurple;
+          context.fillRect(anchorX - Math.round(width / 2), roofY - 3, width, 3);
+          context.globalAlpha = 1;
+          context.fillStyle = PALETTE.blackPurple;
+          context.fillRect(x, y + 4, 16, 12);
+          context.fillStyle = PALETTE.scarfCoral;
+          context.fillRect(x + 2, y + 6, 12, 8);
+          context.fillStyle = PALETTE.neonCyan;
+          context.fillRect(x + 3, y, 4, 5);
+          context.fillRect(x + 9, y - 1, 4, 6);
+          return;
+        }
+        // Landed: jagged pile of shards and soil.
+        context.fillStyle = PALETTE.blackPurple;
+        context.fillRect(x, y + 6, 30, 6);
+        context.fillRect(x + 4, y + 2, 8, 6);
+        context.fillRect(x + 16, y, 8, 8);
+        context.fillStyle = PALETTE.scarfCoral;
+        context.fillRect(x + 5, y + 3, 6, 4);
+        context.fillRect(x + 17, y + 1, 6, 5);
+        context.fillRect(x + 2, y + 7, 26, 3);
+        return;
+      }
     }
   }
 

@@ -43,6 +43,7 @@ class GameApp {
   private powerListKey = "";
   private lastPowerPickups = 0;
   private lastShieldBreaks = 0;
+  private lastStomps = 0;
   private readonly secondaryButton = requiredElement<HTMLButtonElement>("#secondary-button");
   private readonly racePlayers = requiredElement<HTMLOListElement>("#race-players");
   private readonly raceInvite = requiredElement<HTMLElement>("#race-invite");
@@ -492,6 +493,7 @@ class GameApp {
     this.lastPlatformId = 0;
     this.lastPowerPickups = 0;
     this.lastShieldBreaks = 0;
+    this.lastStomps = 0;
     this.renderer.effects.clear();
     this.resetRunUi();
   }
@@ -606,6 +608,13 @@ class GameApp {
       this.liveStatus.textContent = CONTENT.powers.smash;
     }
     this.lastShieldBreaks = snapshot.shieldBreaks;
+    if (snapshot.stomps > this.lastStomps) {
+      this.audio.play("smash");
+      effects.burst(cat.x + cat.width / 2, cat.y + cat.height, 14, PALETTE.hazard, 0.24, 0.14, now);
+      effects.floatText(cat.x + cat.width / 2, cat.y - 10, "+30", PALETTE.hazard, now);
+      this.liveStatus.textContent = CONTENT.powers.stomp;
+    }
+    this.lastStomps = snapshot.stomps;
     if (!this.lastGrounded && cat.grounded) {
       this.renderer.triggerLanding();
       this.audio.play("land");

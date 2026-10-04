@@ -1,6 +1,26 @@
 import { PHYSICS } from "../../src/game/config";
-import { descendingFlightTime } from "../../src/game/platform-generator";
-import type { WorldSnapshot } from "../../src/game/types";
+import { descendingFlightTime, doubleJumpFlightTime } from "../../src/game/platform-generator";
+import type { Platform, WorldRect, WorldSnapshot } from "../../src/game/types";
+
+// The box a held jump must clear on this roof, if any. Moving enemies are
+// reduced to a conservative static box (see docs/POWERS_AND_ENEMIES.md).
+function obstacleOf(roof: Platform): WorldRect | null {
+  const hazard = roof.hazard;
+  if (hazard && !hazard.broken && hazard.popup?.phase !== "hidden") return hazard;
+  const enemy = roof.enemy;
+  if (!enemy || enemy.broken) return null;
+  switch (enemy.kind) {
+    case "robot":
+      return { x: enemy.x - 20, y: enemy.y, width: enemy.width + 40, height: enemy.height };
+    case "laser":
+      return enemy;
+    case "pot":
+      return { x: enemy.anchorX - 15, y: roof.y - 12, width: 30, height: 12 };
+    case "crow":
+      // Danger only while the centres are within ~17px: the cat must be >= 36px up then.
+      return { x: enemy.anchorX - 6, y: roof.y - 36, width: 12, height: 36 };
+  }
+}
 
 // Seconds until a held arc with vertical speed `vy` descends `drop` px below now.
 function heldLandingTime(vy: number, drop: number): number | null {
@@ -18,7 +38,8 @@ export function shouldJump(snapshot: WorldSnapshot): boolean {
   const { cat, platforms } = snapshot;
   if (!cat.grounded) {
     // Use at most the normal double jump; a feather's extra jump stays in reserve.
-    if (cat.jumpsRemaining - (snapshot.powers.feather > 0 ? 1 : 0) < 1) return false;
+    const airJumps = cat.jumpsRemaining - (snapshot.powers.feather > 0 ? 1 : 0);
+    if (airJumps < 1) return false;
     const landingAhead = platforms.some(p => {
       const time = heldLandingTime(cat.vy, p.y - cat.y - cat.height);
       if (time === null) return false;
@@ -26,19 +47,22 @@ export function shouldJump(snapshot: WorldSnapshot): boolean {
       return x + cat.width > p.x + 4 && x < p.x + p.width - 4;
     });
     if (landingAhead) return false;
-    // Double-jump only once a fresh held arc from here lands on a roof.
-    return platforms.some(p => {
-      const time = descendingFlightTime(p.y - cat.y - cat.height);
+    // Jump once a fresh held arc from here lands on a roof — or, with two air
+    // jumps left (e.g. after a stomp bounce), once a fresh double arc does.
+    const lands = (flight: (yOffset: number) => number | null): boolean => platforms.some(p => {
+      const time = flight(p.y - cat.y - cat.height);
       if (time === null) return false;
       const x = cat.x + cat.vx * time;
       return x + cat.width > p.x + 4 && x < p.x + p.width - 4;
     });
+    return lands(descendingFlightTime) || (airJumps >= 2 && lands(doubleJumpFlightTime));
   }
   const current = platforms.find(p => p.id === cat.platformId);
   const next = platforms.find(p => p.id === cat.platformId! + 1);
   if (!current || !next) return false;
-  const hazard = current.hazard;
-  if (hazard && hazard.popup?.phase !== "hidden" && cat.x < hazard.x + hazard.width) {
+  const hazard = obstacleOf(current);
+  // Only obstacles still ahead: a patrolling robot behind the cat may stretch past it.
+  if (hazard && hazard.x + hazard.width / 2 > cat.x + cat.width / 2) {
     // Launch so the held arc is centred over the obstacle's clearance window.
     const [rise, fall] = clearanceWindow(hazard.height);
     const front = hazard.x - cat.width - cat.vx * rise;

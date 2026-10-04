@@ -58,11 +58,17 @@ export const CONTENT = {
   warnings: {
     popup: "前方路障即将升起！",
     eagle: "飞鹰低空掠过——别起跳，直接跑过去！",
+    crow: "乌鸦俯冲！看准虚线，在它贴地时跳过去！",
+    pot: "小心头顶花盆！落地碎片要跳过去！",
   },
   failures: {
     hazard: "碰到路障了。提前起跳，越过条纹挡板。",
     tower: "信号塔太高了。按住跳跃键跳满，才能越过去。",
     eagle: "撞上飞鹰了。它低飞经过时别起跳，从下面跑过去。",
+    robot: "被巡逻机器人撞倒了。轻跳越过它，或者从上方踩下去！",
+    laser: "被激光电到了。激光亮着时要按住跳满才能越过。",
+    crow: "被俯冲的乌鸦撞到了。等它贴近屋顶时再起跳，别太早。",
+    pot: "被花盆砸中了。碎片落地后要跳过去。",
   },
   result: (score: number, bestScore: number): string =>
     `本局 ${score} · 最高 ${bestScore}`,
@@ -83,6 +89,7 @@ export const CONTENT = {
       double: "双倍得分！",
     },
     smash: "护盾撞碎了障碍！+20",
+    stomp: "踩扁机器人！+30",
     chip: (name: string, seconds: number): string => `${name} ${seconds}s`,
     rocketLanding: "火箭降落中",
     listLabel: "生效中的能力",

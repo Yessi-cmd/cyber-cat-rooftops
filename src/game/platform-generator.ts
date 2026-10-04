@@ -4,6 +4,7 @@ import {
   MIN_ROOF_WORLD_Y,
   PHYSICS,
   POWERS,
+  ENEMIES,
   ROOF_FEATURES,
   getDifficulty,
   hazardOffsetAt,
@@ -146,7 +147,7 @@ export class PlatformGenerator {
   // Power-ups only float over plain roofs, centred, never two close together.
   private addPower(platform: Platform): Platform {
     if (
-      platform.hazard !== undefined || platform.eagle !== undefined ||
+      platform.hazard !== undefined || platform.eagle !== undefined || platform.enemy !== undefined ||
       platform.id < POWERS.firstRoofId || platform.id - this.lastPowerId < POWERS.minRoofSpacing
     ) {
       return platform;
@@ -175,8 +176,20 @@ export class PlatformGenerator {
   private pickFeature(id: number): RoofFeatureKind {
     const introduced = INTRODUCED_FEATURES[id];
     if (introduced !== undefined) return introduced;
+    const enemyIntro = (ENEMIES.introductions as Readonly<Record<number, RoofFeatureKind>>)[id];
+    if (enemyIntro !== undefined) return enemyIntro;
     if (id < 11) return "barrier";
     const roll = this.random.next();
-    return roll < 0.4 ? "barrier" : roll < 0.7 ? "tower" : "eagle";
+    if (id < 27) return roll < 0.4 ? "barrier" : roll < 0.7 ? "tower" : "eagle";
+    // Late game: the classic three plus every enemy.
+    const table: [RoofFeatureKind, number][] = [
+      ["barrier", 0.2], ["tower", 0.15], ["eagle", 0.15], ["robot", 0.15], ["laser", 0.12], ["crow", 0.12], ["pot", 0.11],
+    ];
+    let remaining = roll;
+    for (const [kind, weight] of table) {
+      remaining -= weight;
+      if (remaining < 0) return kind;
+    }
+    return "barrier";
   }
 }

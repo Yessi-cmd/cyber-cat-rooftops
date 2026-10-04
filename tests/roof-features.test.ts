@@ -24,7 +24,7 @@ describe("roof hazards and rewards", () => {
       for (let index = 0; index < 40; index += 1) {
         const platform = generator.next(previous, index * 30);
         if (platform.id < 3) expect(platform.hazard).toBeUndefined();
-        if (platform.eagle) hazardCount += 1;
+        if (platform.eagle || platform.enemy) hazardCount += 1;
         if (platform.hazard) {
           hazardCount += 1;
           expect(platform.width).toBeGreaterThanOrEqual(ROOF_FEATURES.hazardPlatformWidth);

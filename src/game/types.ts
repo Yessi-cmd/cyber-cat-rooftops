@@ -31,7 +31,18 @@ export type GapKind = "near" | "medium" | "far";
 
 // "barrier" can be cleared by a short hop; "tower" needs a held, full jump.
 export type HazardKind = "barrier" | "tower";
-export type RoofFeatureKind = HazardKind | "eagle";
+export type EnemyKind = "robot" | "laser" | "crow" | "pot";
+export type RoofFeatureKind = HazardKind | "eagle" | EnemyKind;
+
+export interface Enemy extends WorldRect {
+  kind: EnemyKind;
+  anchorX: number; // world x the enemy is centred on / meets the cat at
+  roofY: number;
+  // Laser: lit. Pot: landed (shards on the roof). Others: always true.
+  active: boolean;
+  phase: number;
+  broken?: boolean;
+}
 
 export interface Hazard extends WorldRect {
   kind?: HazardKind;
@@ -57,7 +68,7 @@ export interface PowerItem extends WorldRect {
 // Seconds remaining for each power; 0 means inactive.
 export type PowerTimers = Record<PowerKind, number>;
 
-export type FailureReason = "fall" | "hazard" | "tower" | "eagle";
+export type FailureReason = "fall" | "hazard" | "tower" | "eagle" | EnemyKind;
 
 export interface Platform {
   id: number;
@@ -68,6 +79,7 @@ export interface Platform {
   gapKind?: GapKind;
   hazard?: Hazard;
   eagle?: Eagle;
+  enemy?: Enemy;
   power?: PowerItem;
   rewards?: Reward[];
 }
@@ -84,12 +96,13 @@ export interface WorldSnapshot {
   bestCombo: number;
   multiplier: number;
   stage: number;
-  warning: "popup" | "eagle" | null;
+  warning: "popup" | "eagle" | "crow" | "pot" | null;
   powers: Readonly<PowerTimers>;
   rocketing: boolean;
   // Monotonic counters so the UI can play cues without diffing the world.
   powerPickups: number;
   lastPower: PowerKind | null;
   shieldBreaks: number;
+  stomps: number;
   failureReason: FailureReason | null;
 }

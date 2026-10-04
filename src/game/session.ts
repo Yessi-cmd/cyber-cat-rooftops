@@ -1,5 +1,6 @@
 import {
   CAMERA,
+  ENEMIES,
   GAME_HEIGHT,
   GAME_WIDTH,
   PHYSICS,
@@ -19,6 +20,7 @@ import {
   rocketTargetY,
 } from "./powers";
 import { advancePopupHazards, placeEagle } from "./roof-features";
+import { enemyIsDangerous, enemyWarning, isStomp, placeEnemy } from "./enemies";
 import { sweptCatIntersects } from "./swept-collision";
 import { PlatformGenerator } from "./platform-generator";
 import type { Cat, FailureReason, Platform, PowerKind, PowerTimers, WorldSnapshot } from "./types";
@@ -55,6 +57,8 @@ export class GameSession {
   private furthestPlatformId = START_PLATFORM.id;
   private viewWidth = GAME_WIDTH;
   private coyoteRemaining = 0;
+  // Set when the cat runs off an edge; spends the ground jump once coyote time ends.
+  private walkedOff = false;
   private jumpBufferRemaining = 0;
   private jumps = 0;
   private jumpHeld = false;
@@ -71,6 +75,9 @@ export class GameSession {
   private shieldBreaks = 0;
   // A rocket skips gaps without their fish; don't let that break the combo.
   private keepCombo = false;
+  private stomps = 0;
+  // Simulation seconds this run; drives the blinking lasers.
+  private elapsed = 0;
 
   get jumpCount(): number {
     return this.jumps;
@@ -96,6 +103,7 @@ export class GameSession {
     this.score = 0;
     this.progress = 0;
     this.coyoteRemaining = 0;
+    this.walkedOff = false;
     this.jumpBufferRemaining = 0;
     this.jumps = 0;
     this.jumpHeld = false;
@@ -115,6 +123,8 @@ export class GameSession {
     this.lastPower = null;
     this.shieldBreaks = 0;
     this.keepCombo = false;
+    this.stomps = 0;
+    this.elapsed = 0;
     this.fillPlatforms();
   }
 
@@ -142,6 +152,7 @@ export class GameSession {
     }
 
     this.coyoteRemaining = 0;
+    this.walkedOff = false;
     this.jumpBufferRemaining = 0;
     this.jumps += 1;
     this.cat.jumpsRemaining -= 1;
@@ -169,9 +180,13 @@ export class GameSession {
     this.jumpBufferRemaining = Math.max(0, this.jumpBufferRemaining - delta);
     this.coyoteRemaining = Math.max(0, this.coyoteRemaining - delta);
     this.tickPowers(delta);
-    if (!this.cat.grounded && this.coyoteRemaining <= 0 && !this.rocketing) {
-      // Walking off spends the ground jump; keep the air jumps.
-      this.cat.jumpsRemaining = Math.min(maxJumpsFor(this.powers) - 1, this.cat.jumpsRemaining);
+    this.elapsed += delta;
+    if (this.walkedOff && this.coyoteRemaining <= 0) {
+      // Walking off spends the ground jump once; later refills (stomps) stand.
+      this.walkedOff = false;
+      if (!this.cat.grounded && !this.rocketing) {
+        this.cat.jumpsRemaining = Math.min(maxJumpsFor(this.powers) - 1, this.cat.jumpsRemaining);
+      }
     }
     advancePopupHazards(this.platforms, this.cat, delta);
     this.cat.previousX = this.cat.x;
@@ -186,6 +201,7 @@ export class GameSession {
 
     if (this.cat.grounded && !this.isSupported()) {
       this.coyoteRemaining = PHYSICS.coyoteSeconds;
+      this.walkedOff = true;
       this.cat.grounded = false;
       this.cat.platformId = null;
     }
@@ -253,6 +269,7 @@ export class GameSession {
       powerPickups: this.powerPickups,
       lastPower: this.lastPower,
       shieldBreaks: this.shieldBreaks,
+      stomps: this.stomps,
       failureReason: this.failureReason,
     };
   }
@@ -279,6 +296,7 @@ export class GameSession {
       this.rocketSeekTime = 0;
       this.jumpBufferRemaining = 0;
       this.coyoteRemaining = 0;
+      this.walkedOff = false;
       this.cat.grounded = false;
       this.cat.platformId = null;
       this.cat.vy = 0;
@@ -324,10 +342,12 @@ export class GameSession {
     for (const platform of this.platforms) {
       if (platform.hazard?.popup?.phase === "warning") return "popup";
       const eagle = platform.eagle;
-      if (eagle) {
+      if (eagle && !eagle.broken) {
         const ahead = eagle.x + eagle.width / 2 - catCenter;
         if (ahead > 0 && ahead <= ROOF_FEATURES.eagleWarningDistance) return "eagle";
       }
+      const enemyAlert = platform.enemy ? enemyWarning(platform.enemy, this.cat) : null;
+      if (enemyAlert !== null) return enemyAlert;
     }
     return null;
   }
@@ -346,10 +366,29 @@ export class GameSession {
         reason = hazard.kind === "tower" ? "tower" : "hazard";
       }
       if (eagle && !eagle.broken && sweptCatIntersects(this.cat, eagle)) reason = "eagle";
+      const enemy = platform.enemy;
+      if (enemy) {
+        placeEnemy(enemy, this.cat, this.elapsed);
+        if (enemyIsDangerous(enemy) && sweptCatIntersects(this.cat, enemy)) {
+          if (isStomp(enemy, this.cat)) {
+            // Landing on a robot defeats it and springs the cat back up.
+            enemy.broken = true;
+            this.stomps += 1;
+            this.powerBonus += ENEMIES.stompBonus;
+            this.cat.vy = ENEMIES.stompBounce;
+            // A stomp counts as a landing: the bounce may carry the cat past the
+            // roof edge, so it must still have a full double jump to recover.
+            this.cat.jumpsRemaining = maxJumpsFor(this.powers);
+            continue;
+          }
+          reason = enemy.kind;
+        }
+      }
       if (reason === null || invulnerable) continue;
       if (this.powers.shield > 0) {
         // The shield smashes what it hits, then grants a moment of safety.
         if (reason === "eagle") eagle!.broken = true;
+        else if (enemy && reason === enemy.kind) enemy.broken = true;
         else hazard!.broken = true;
         this.powers.shield = 0;
         this.grace = POWERS.graceSeconds;
@@ -433,6 +472,7 @@ export class GameSession {
       this.cat.vy = 0;
       this.cat.grounded = true;
       this.cat.jumpsRemaining = maxJumpsFor(this.powers);
+      this.walkedOff = false;
       this.cat.platformId = platform.id;
       if (platform.id > this.furthestPlatformId) {
         this.landingBonus += SCORE.landingBonus;
@@ -463,6 +503,7 @@ export class GameSession {
       const next = this.generator.next(last, generationScore);
       // Place on creation so lookahead width never changes what a snapshot shows.
       if (next.eagle) placeEagle(next.eagle, this.cat);
+      if (next.enemy) placeEnemy(next.enemy, this.cat, this.elapsed);
       this.platforms.push(next);
       last = next;
     }

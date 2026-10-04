@@ -1,4 +1,5 @@
-import { PHYSICS, ROOF_FEATURES } from "./config";
+import { ENEMIES, PHYSICS, ROOF_FEATURES } from "./config";
+import { createEnemy } from "./enemies";
 import type { Cat, Eagle, Platform, Reward, RoofFeatureKind } from "./types";
 
 export function hasHazardRoof(id: number, score: number): boolean {
@@ -61,6 +62,13 @@ export function addRoofFeatures(
     };
     // Fish along the running line reward staying low under the eagle.
     for (const offset of [-36, 0, 36]) addReward(crossX + offset, platform.y - 14);
+  } else if (feature !== null) {
+    const anchorX = x + ENEMIES.anchorAfterOffset + (feature === "crow" ? ENEMIES.crowCrossOffset : 0);
+    platform.enemy = createEnemy(feature, platform, anchorX);
+    // A fish arc over each enemy rewards clearing it in the air.
+    addReward(anchorX - 22, platform.y - 64);
+    addReward(anchorX, platform.y - 86);
+    addReward(anchorX + 22, platform.y - 64);
   }
   platform.rewards = rewards;
   return platform;
