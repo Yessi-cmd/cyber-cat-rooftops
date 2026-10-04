@@ -43,3 +43,13 @@
 - 新增单测：协议校验 3 项，房间状态机 5 项（建房/加入/满员、只有房主能开赛、倒计时、状态转发、排名与再来一局、中途加入观战、离开与房主移交、超时结算、房间上限），真实 WebSocket 集成 3 项（完整一局、Origin/路径拒绝、IP 上限/坏消息/限流），浏览器端控制器 3 项（连接后发送、种子只交出一次、上报节流、幽灵插值、断线）。联机新增 14 项，全部 87 项通过。
 - 本地浏览器（Vite 代理 + 本地中转）实测：标签页 A 建房，B 通过邀请链接加入，双方玩家列表、房主标签、按钮状态正确；房主开赛后两边同时显示倒计时「3」。
 - 未验证：Chrome 窗口处于后台导致动画帧暂停，倒计时之后的实际同场奔跑、幽灵猫显示和结算界面没有在浏览器中实测；手机真机和跨网络对战也未测，需要在生产站用两台设备试玩确认。
+
+## 生产部署（2026-10-04）
+
+- VPS 通过 Debian 官方源安装 `nodejs` 18.20.4（`--no-install-recommends`）；安装 `cyber-cat-race.service` 并设为开机启动，`systemd-analyze verify` 通过。
+- `npm run deploy:race` 部署 `88fb11b` 到 `/opt/cyber-cat-race/releases/20261004T112235Z-88fb11b371a6`：服务处于 active，只监听 `127.0.0.1:8790`，内存约 30MB。
+- Caddy：先备份为 `game.norliva.top.caddy.backup.20261004-072256`，上传新配置（`/ws` 反代、CSP 放行 `wss://game.norliva.top`），`caddy validate` 通过后再 reload；同机的 mark6、xj 站点仍返回 200。
+- 静态站点部署到 `20261004T112316Z-88fb11b371a6`：首页 200，CSP 已更新，引用的 `index-DCzatYfF.js` 与本地构建一致。
+- 生产端到端：两个 WebSocket 客户端经 Cloudflare 完成建房、加入、同种子倒计时、状态转发（约 187ms）、双方结束、结算排名；`Origin: https://evil.example` 被 403 拒绝。
+- 回滚：静态站点切回 `20261004T014103Z-0b1d946047ae`；联机可用 `systemctl disable --now cyber-cat-race` 关闭，Caddy 备份文件可直接还原。
+- 仍待人工验证：两台真实设备（尤其手机）在生产站同场试玩，确认幽灵猫、实时排名、结算和再来一局。
