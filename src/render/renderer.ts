@@ -1,5 +1,5 @@
 import { GAME_HEIGHT, GAME_WIDTH } from "../game/config";
-import type { GameState, WorldSnapshot, WorldRect } from "../game/types";
+import type { Eagle, GameState, Hazard, WorldSnapshot, WorldRect } from "../game/types";
 import { LAND_ANIMATION_DURATION_MS, selectCatPose } from "./cat-animation";
 import { EffectLayer } from "./effects";
 import { PALETTE } from "./palette";
@@ -50,7 +50,7 @@ export class Renderer {
     );
     if (gameState === "playing" && !reducedMotion) this.drawSpeedLines(snapshot.cat.vx, nowMs);
     this.drawPlatforms(snapshot, true, nowMs);
-    this.drawFeatures(snapshot);
+    this.drawFeatures(snapshot, reducedMotion, nowMs);
     this.drawCat(snapshot, gameState, reducedMotion || gameState !== "playing", nowMs);
     this.effects.draw(context, snapshot.cameraX, snapshot.cameraY, nowMs, reducedMotion);
     context.restore();
@@ -189,7 +189,7 @@ export class Renderer {
       }
 
       const decoration = selectRoofDecoration(platform.id, platform.width);
-      if (decoration !== "none" && !platform.hazard) {
+      if (decoration !== "none" && !platform.hazard && !platform.eagle) {
         const offset = getRoofDecorationOffset(platform.id, platform.width, decoration);
         this.drawRoofDecoration(
           decoration,
@@ -236,10 +236,12 @@ export class Renderer {
     }
   }
 
-  private drawFeatures(snapshot: WorldSnapshot): void {
+  private drawFeatures(snapshot: WorldSnapshot, reducedMotion: boolean, nowMs: number): void {
     const context = this.context;
     for (const platform of snapshot.platforms) {
-      if (platform.hazard && platform.hazard.popup?.phase !== "hidden") {
+      if (platform.hazard?.kind === "tower") {
+        this.drawSignalTower(platform.hazard, snapshot.cameraX, snapshot.cameraY);
+      } else if (platform.hazard && platform.hazard.popup?.phase !== "hidden") {
         const x = Math.round(platform.hazard.x - snapshot.cameraX);
         const y = Math.round(platform.hazard.y - snapshot.cameraY);
         if (x + platform.hazard.width >= 0 && x <= this.logicalWidth) {
@@ -272,6 +274,70 @@ export class Renderer {
         if (!reward.collected) this.drawReward(reward, snapshot.cameraX, snapshot.cameraY);
       }
     }
+    // Eagles fly over everything on the roof, so draw them last.
+    for (const platform of snapshot.platforms) {
+      if (platform.eagle) this.drawEagle(platform.eagle, snapshot.cameraX, snapshot.cameraY, reducedMotion, nowMs);
+    }
+  }
+
+  // Fills the whole collision box: striped mast, cross bars and a red tip.
+  private drawSignalTower(hazard: Hazard, cameraX: number, cameraY: number): void {
+    const x = Math.round(hazard.x - cameraX);
+    const y = Math.round(hazard.y - cameraY);
+    if (x + hazard.width < 0 || x > this.logicalWidth) return;
+    const context = this.context;
+    const { width, height } = hazard;
+    const mastX = x + Math.floor(width / 2) - 3;
+    context.fillStyle = PALETTE.blackPurple;
+    context.fillRect(mastX - 1, y + 4, 8, height - 4);
+    context.fillRect(x, y + height - 6, width, 6);
+    context.fillRect(x, y + 10, width, 3);
+    context.fillRect(x + 2, y + 20, width - 4, 3);
+    context.fillStyle = PALETTE.hazard;
+    context.fillRect(mastX, y + 5, 6, height - 11);
+    context.fillRect(mastX, y, 6, 5);
+    context.fillStyle = PALETTE.catCream;
+    for (let band = y + 8; band < y + height - 8; band += 8) context.fillRect(mastX, band, 6, 3);
+    context.fillRect(mastX + 2, y + 1, 2, 2);
+  }
+
+  // Left-facing pixel eagle; wings flap unless reduced motion is on.
+  private drawEagle(eagle: Eagle, cameraX: number, cameraY: number, reducedMotion: boolean, nowMs: number): void {
+    const x = Math.round(eagle.x - cameraX);
+    const y = Math.round(eagle.y - cameraY);
+    if (x + eagle.width < -10 || x > this.logicalWidth + 10) return;
+    const context = this.context;
+    // Two flap frames; reduced motion holds the wings level.
+    const wing = reducedMotion ? "level" : Math.floor(nowMs / 140) % 2 === 0 ? "up" : "down";
+    context.fillStyle = PALETTE.blackPurple;
+    // Body and fanned tail.
+    context.fillRect(x + 8, y + 7, 23, 7);
+    context.fillRect(x + 29, y + 6, 8, 3);
+    context.fillRect(x + 30, y + 10, 10, 3);
+    context.fillRect(x + 29, y + 13, 7, 2);
+    // Wing stays inside the collision box; the red band marks it as a hazard.
+    if (wing === "up") {
+      context.fillRect(x + 12, y, 16, 3);
+      context.fillRect(x + 14, y + 3, 14, 4);
+    } else if (wing === "down") {
+      context.fillRect(x + 12, y + 12, 16, 3);
+      context.fillRect(x + 14, y + 15, 12, 3);
+    } else {
+      context.fillRect(x + 10, y + 4, 22, 4);
+    }
+    context.fillStyle = PALETTE.hazard;
+    if (wing === "up") context.fillRect(x + 14, y + 1, 13, 2);
+    else if (wing === "down") context.fillRect(x + 14, y + 13, 13, 2);
+    else context.fillRect(x + 11, y + 5, 20, 2);
+    context.fillRect(x + 12, y + 9, 16, 2);
+    // White head, hooked yellow beak and eye.
+    context.fillStyle = PALETTE.catCream;
+    context.fillRect(x + 3, y + 5, 8, 7);
+    context.fillStyle = PALETTE.reward;
+    context.fillRect(x, y + 8, 4, 2);
+    context.fillRect(x + 1, y + 10, 2, 1);
+    context.fillStyle = PALETTE.blackPurple;
+    context.fillRect(x + 5, y + 7, 2, 2);
   }
 
   private drawReward(reward: WorldRect, cameraX: number, cameraY: number): void {
@@ -454,6 +520,19 @@ export class Renderer {
     context.fillRect(x + 4, y + 25 + bob + pose.backLegOffset, 5, 2);
     context.fillRect(x + 15, y + 25 + bob + pose.frontLegOffset, 5, 2);
     if (angle !== 0) context.restore();
+
+    // A gold star above the head while a mid-air jump is still available.
+    if (gameState === "playing" && !cat.grounded && cat.jumpsRemaining > 0) {
+      const starX = x + 9;
+      const starY = y - 11;
+      context.fillStyle = PALETTE.blackPurple;
+      context.fillRect(starX - 1, starY + 1, 9, 5);
+      context.fillRect(starX + 2, starY - 2, 3, 11);
+      context.fillStyle = PALETTE.reward;
+      context.fillRect(starX, starY + 2, 7, 3);
+      context.fillRect(starX + 3, starY - 1, 1, 9);
+      context.fillRect(starX + 2, starY + 1, 3, 5);
+    }
   }
 
   private positiveModulo(value: number, divisor: number): number {

@@ -40,7 +40,7 @@ class GameApp {
   private announcedMultiplier = 1;
   private recordAnnounced = false;
   private runStartBest = 0;
-  private displayedWarning = false;
+  private displayedWarning: WorldSnapshot["warning"] = null;
   private displayedJumps = -1;
   private displayedLoot = -1;
   private lastCollectedCount = 0;
@@ -112,9 +112,9 @@ class GameApp {
     }
 
     const snapshot = this.session.snapshot();
-    if (snapshot.hazardWarning !== this.displayedWarning) {
-      this.displayedWarning = snapshot.hazardWarning;
-      this.hazardStatus.textContent = snapshot.hazardWarning ? CONTENT.hazardWarning : "";
+    if (snapshot.warning !== this.displayedWarning) {
+      this.displayedWarning = snapshot.warning;
+      this.hazardStatus.textContent = snapshot.warning ? CONTENT.warnings[snapshot.warning] : "";
     }
     if (snapshot.score !== this.displayedScore) {
       this.displayedScore = snapshot.score;
@@ -339,8 +339,9 @@ class GameApp {
       this.result.textContent = CONTENT.result(score, this.bestScore) +
         " · " + CONTENT.loot(this.session.snapshot().collectedCount) +
         " · " + CONTENT.bestCombo(this.session.snapshot().bestCombo);
-      if (this.session.snapshot().failureReason === "hazard") {
-        this.overlayCopy.textContent = CONTENT.hazardFailure;
+      const reason = this.session.snapshot().failureReason;
+      if (reason !== null && reason !== "fall") {
+        this.overlayCopy.textContent = CONTENT.failures[reason];
       }
     }
   }

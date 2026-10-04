@@ -9,7 +9,10 @@ import {
 } from "./config";
 import { SeededRandom } from "./random";
 import { addRoofFeatures, hasHazardRoof } from "./roof-features";
-import type { GapKind, Platform } from "./types";
+import type { GapKind, Platform, RoofFeatureKind } from "./types";
+
+// First appearances are fixed so each obstacle is introduced alone.
+const INTRODUCED_FEATURES: Readonly<Record<number, RoofFeatureKind>> = { 3: "barrier", 7: "tower", 11: "eagle" };
 
 const REACH_SAFETY = 14;
 
@@ -93,7 +96,8 @@ export class PlatformGenerator {
     const gapKind = this.gapBag.pop()!;
     const minGap = gapKind === "far" ? difficulty.minGap : Math.round(GAP_RANGES[gapKind][0] * difficulty.runSpeed);
     const maxGap = gapKind === "far" ? difficulty.maxGap : Math.round(GAP_RANGES[gapKind][1] * difficulty.runSpeed);
-    const popup = hazardRoof && (this.nextId === 3 || this.random.next() < 0.55);
+    const feature = hazardRoof ? this.pickFeature(this.nextId) : null;
+    const popup = feature === "barrier" && (this.nextId === 3 || this.random.next() < 0.55);
     // Faster runs land deeper into the roof, so the hazard and roof shift right together.
     const hazardOffset = hazardOffsetAt(difficulty.runSpeed);
     const hazardRoofWidth = ROOF_FEATURES.hazardPlatformWidth + hazardOffset - ROOF_FEATURES.hazardOffset;
@@ -121,7 +125,7 @@ export class PlatformGenerator {
         !isPlatformReachableWithoutJump(previous, candidate, difficulty.runSpeed)
       ) {
         this.nextId += 1;
-        return addRoofFeatures(previous, candidate, hazardRoof, popup, hazardOffset);
+        return addRoofFeatures(previous, candidate, feature, popup, hazardOffset);
       }
     }
 
@@ -134,6 +138,14 @@ export class PlatformGenerator {
       height: 36,
     };
     this.nextId += 1;
-    return addRoofFeatures(previous, fallback, hazardRoof, popup, hazardOffset);
+    return addRoofFeatures(previous, fallback, feature, popup, hazardOffset);
+  }
+
+  private pickFeature(id: number): RoofFeatureKind {
+    const introduced = INTRODUCED_FEATURES[id];
+    if (introduced !== undefined) return introduced;
+    if (id < 11) return "barrier";
+    const roll = this.random.next();
+    return roll < 0.4 ? "barrier" : roll < 0.7 ? "tower" : "eagle";
   }
 }

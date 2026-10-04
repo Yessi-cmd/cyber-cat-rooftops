@@ -227,7 +227,9 @@ describe("GameSession", () => {
         for (const [index, session] of sessions.entries()) {
           expect(session.update(PHYSICS.fixedStep), `seed=${seed}, step=${step}`).toBe(false);
           for (const platform of session.snapshot().platforms) {
-            generated[index]!.set(platform.id, JSON.stringify(platform));
+            // Eagle x is derived from the cat each step; compare the generated layout only.
+            generated[index]!.set(platform.id, JSON.stringify(platform, (key, value) =>
+              key === "eagle" ? { ...value, x: undefined } : value));
           }
         }
         for (const session of [desktop, resized]) {

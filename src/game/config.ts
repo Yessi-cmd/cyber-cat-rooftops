@@ -53,6 +53,16 @@ export const ROOF_FEATURES = {
   hazardPlatformWidth: 340,
   hazardWidth: 24,
   hazardHeight: 20,
+  // Taller than a short hop (~40px apex) but well under a held jump (77px).
+  towerWidth: 14,
+  towerHeight: 44,
+  // Eagle flies this many px above a running cat's head, so only a jump hits it.
+  eagleWidth: 40,
+  eagleHeight: 18,
+  eagleClearance: 12,
+  eagleSpeedRatio: 0.6, // eagle world speed toward the cat, relative to run speed
+  eagleCrossOffset: 40, // px past the hazard offset where cat and eagle meet
+  eagleWarningDistance: 360, // px between centres when the DOM warning appears
   hazardOffset: 120, // px minimum; grows with speed via hazardOffsetAt().
   hazardLandingSeconds: 0.62, // s of running between a fast landing point and the hazard.
   rewardWidth: 16,

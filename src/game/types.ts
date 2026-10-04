@@ -29,9 +29,22 @@ export interface Reward extends WorldRect {
 
 export type GapKind = "near" | "medium" | "far";
 
+// "barrier" can be cleared by a short hop; "tower" needs a held, full jump.
+export type HazardKind = "barrier" | "tower";
+export type RoofFeatureKind = HazardKind | "eagle";
+
 export interface Hazard extends WorldRect {
+  kind?: HazardKind;
   popup?: { phase: "hidden" | "warning" | "active"; elapsed: number };
 }
+
+// Flies low toward the cat; its x follows the cat's progress so the two
+// always meet at `crossX` (world x of both centres) mid-roof.
+export interface Eagle extends WorldRect {
+  crossX: number;
+}
+
+export type FailureReason = "fall" | "hazard" | "tower" | "eagle";
 
 export interface Platform {
   id: number;
@@ -41,6 +54,7 @@ export interface Platform {
   height: number;
   gapKind?: GapKind;
   hazard?: Hazard;
+  eagle?: Eagle;
   rewards?: Reward[];
 }
 
@@ -56,6 +70,6 @@ export interface WorldSnapshot {
   bestCombo: number;
   multiplier: number;
   stage: number;
-  hazardWarning: boolean;
-  failureReason: "fall" | "hazard" | null;
+  warning: "popup" | "eagle" | null;
+  failureReason: FailureReason | null;
 }

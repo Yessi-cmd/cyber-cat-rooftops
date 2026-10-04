@@ -9,10 +9,10 @@ import {
   getDifficulty,
   stageAt,
 } from "./config";
-import { advancePopupHazards } from "./roof-features";
+import { advancePopupHazards, placeEagle } from "./roof-features";
 import { sweptCatIntersects } from "./swept-collision";
 import { PlatformGenerator } from "./platform-generator";
-import type { Cat, Platform, WorldSnapshot } from "./types";
+import type { Cat, FailureReason, Platform, WorldSnapshot } from "./types";
 
 const START_PLATFORM: Platform = {
   id: 0,
@@ -44,7 +44,7 @@ export class GameSession {
   private jumps = 0;
   private jumpHeld = false;
   private collectedCount = 0;
-  private failureReason: "fall" | "hazard" | null = null;
+  private failureReason: FailureReason | null = null;
 
   get jumpCount(): number {
     return this.jumps;
@@ -197,15 +197,37 @@ export class GameSession {
       bestCombo: this.bestCombo,
       multiplier: comboMultiplier(this.combo),
       stage: stageAt(this.progress),
-      hazardWarning: this.platforms.some(platform => platform.hazard?.popup?.phase === "warning"),
+      warning: this.currentWarning(),
       failureReason: this.failureReason,
     };
   }
 
+  private currentWarning(): WorldSnapshot["warning"] {
+    const catCenter = this.cat.x + this.cat.width / 2;
+    for (const platform of this.platforms) {
+      if (platform.hazard?.popup?.phase === "warning") return "popup";
+      const eagle = platform.eagle;
+      if (eagle) {
+        const ahead = eagle.x + eagle.width / 2 - catCenter;
+        if (ahead > 0 && ahead <= ROOF_FEATURES.eagleWarningDistance) return "eagle";
+      }
+    }
+    return null;
+  }
+
   private resolveFeatures(): boolean {
     for (const platform of this.platforms) {
-      if (platform.hazard && (!platform.hazard.popup || platform.hazard.popup.phase === "active") && sweptCatIntersects(this.cat, platform.hazard)) {
-        this.failureReason = "hazard";
+      const hazard = platform.hazard;
+      let reason: FailureReason | null = null;
+      if (hazard && (!hazard.popup || hazard.popup.phase === "active") && sweptCatIntersects(this.cat, hazard)) {
+        reason = hazard.kind === "tower" ? "tower" : "hazard";
+      }
+      if (platform.eagle) {
+        placeEagle(platform.eagle, this.cat);
+        if (sweptCatIntersects(this.cat, platform.eagle)) reason = "eagle";
+      }
+      if (reason !== null) {
+        this.failureReason = reason;
         this.clearPendingInput();
         return true;
       }
@@ -302,6 +324,8 @@ export class GameSession {
         Math.floor(Math.max(0, last.x - 70) / SCORE.distancePixelsPerPoint) +
         last.id * SCORE.landingBonus;
       const next = this.generator.next(last, generationScore);
+      // Place on creation so lookahead width never changes what a snapshot shows.
+      if (next.eagle) placeEagle(next.eagle, this.cat);
       this.platforms.push(next);
       last = next;
     }
