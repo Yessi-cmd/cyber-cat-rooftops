@@ -3,7 +3,7 @@ game.norliva.top {
 	encode zstd gzip
 
 	header {
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; media-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' wss://game.norliva.top; media-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests"
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Strict-Transport-Security "max-age=31536000"
@@ -19,6 +19,9 @@ game.norliva.top {
 
 	@share path /favicon.svg /og-card.jpg
 	header @share Cache-Control "public, max-age=86400"
+
+	# Race room relay (systemd: cyber-cat-race). WebSocket upgrades only.
+	reverse_proxy /ws 127.0.0.1:8790
 
 	file_server
 }

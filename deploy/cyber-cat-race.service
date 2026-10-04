@@ -1,0 +1,33 @@
+[Unit]
+Description=Cyber Cat Rooftops race room relay
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /opt/cyber-cat-race/current/server/main.js
+WorkingDirectory=/opt/cyber-cat-race/current
+Environment=NODE_ENV=production
+Environment=RACE_HOST=127.0.0.1
+Environment=RACE_PORT=8790
+Environment=RACE_ALLOWED_ORIGINS=https://game.norliva.top
+Restart=on-failure
+RestartSec=2
+
+# Rooms live in memory only; the service needs no writable paths.
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryMax=128M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

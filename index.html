@@ -57,6 +57,7 @@
           </div>
         </div>
 
+        <ol id="race-board" class="race-board" aria-label="实时排名" hidden></ol>
         <p id="hazard-status" role="status" aria-live="polite"></p>
         <p id="banner" class="banner" aria-hidden="true" hidden></p>
 
@@ -69,7 +70,13 @@
             <h1 id="overlay-title">赛博小猫跳楼顶</h1>
             <p id="overlay-copy">按住跳得高，轻点是小跳；空中再按一次二段跳。吃到楼间鱼干可叠连击；矮挡板轻跳、高信号塔跳满、低飞的鹰别跳。</p>
             <p id="result" class="result" hidden></p>
+            <ol id="race-players" class="race-players" hidden></ol>
+            <div id="race-invite" class="race-invite" hidden>
+              <input id="race-link" class="race-link" type="text" readonly aria-label="邀请链接" />
+              <button id="race-copy" class="secondary-button" type="button">复制邀请链接</button>
+            </div>
             <button id="primary-button" class="primary-button" type="button">开始跳跃</button>
+            <button id="secondary-button" class="secondary-button" type="button" hidden>邀请好友竞速</button>
           </div>
         </div>
 

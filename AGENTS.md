@@ -19,7 +19,7 @@
 
 项目当前已完成 M1/M2 工程校准和 M3 工程验收，生产站 `https://game.norliva.top/` 已在 RackNerd VPS + Cloudflare 上线，M4 发布验收正在进行。iPhone Safari 核心玩法回归通过；新增环境音、减少动态与连续三局待用户用生产站最终签字，Android 验证按产品决定保留到 M4。除非用户另有明确要求，按以下默认值推进：
 
-- 首版是由 RackNerd VPS + Caddy 托管、经 Cloudflare DNS/CDN 代理的纯静态单机游戏，生产地址为 `https://game.norliva.top/`；不实现应用服务器、登录、昵称或全球排行榜。
+- 首版是由 RackNerd VPS + Caddy 托管、经 Cloudflare DNS/CDN 代理的静态游戏，生产地址为 `https://game.norliva.top/`。唯一的服务端组件是用户于 2026-10-04 授权的联机竞速房间中转（`server/`，systemd 服务 `cyber-cat-race`，只在内存中转发消息，见 `docs/MULTIPLAYER.md`）；不实现登录、昵称、持久化用户数据或全球排行榜。
 - 使用 Vite、严格模式 TypeScript、Canvas 2D 和原生 DOM/CSS，不引入大型游戏引擎或 UI 框架。
 - 首发界面使用简体中文；所有用户可见文案集中管理，避免散落在游戏逻辑中，为英文版预留结构。
 - 主角暂用橘白小猫；名称、域名、最终配色和正式素材都应当可替换，不得成为核心逻辑依赖。
@@ -40,7 +40,7 @@
 - 静音、减少动态效果、安全区和横屏提示。
 - 原创或许可明确的像素素材、基础分享信息和 Open Graph 图。
 
-用户已明确授权二段跳及更远楼距，规则见 `docs/DOUBLE_JUMP.md`；已授权长短按变高度、连击倍率与里程碑播报，规则见 `docs/FEEL_AND_COMBO.md`。未经明确授权，不实现账号、排行榜、广告、付费、多角色、剧情或关卡编辑器。实验性功能必须默认关闭，不得复杂化核心路径。
+用户已明确授权二段跳及更远楼距，规则见 `docs/DOUBLE_JUMP.md`；已授权长短按变高度、连击倍率与里程碑播报，规则见 `docs/FEEL_AND_COMBO.md`；已授权最多 4 人的好友联机竞速（同种子同时出发、按分数排名、自动颜色代号、不收集用户数据），规则见 `docs/MULTIPLAYER.md`。联机分数由客户端上报，不可信，不得复用为排行榜。未经明确授权，不实现账号、排行榜、广告、付费、多角色、剧情或关卡编辑器。实验性功能必须默认关闭，不得复杂化核心路径。
 
 ## 4. 目标目录与职责
 
@@ -55,7 +55,10 @@ src/
   ui/                   开始、暂停、失败、设置、提示等 DOM 界面
   storage/              版本化 localStorage 读写与损坏数据恢复
   content/              集中的用户文案；需要时再引入完整 i18n
+  net/                  联机竞速的 WebSocket 客户端与房间视图，不修改规则层
   main.ts               组装依赖和启动应用，不承载游戏规则
+shared/                 前后端共用、无依赖的联机消息协议与校验
+server/                 联机房间中转（纯逻辑房间状态机 + ws 接线），只在内存保存房间
 tests/                  与 src 职责对应的确定性单元/集成测试
 docs/                   计划、设计决策、素材授权和发布清单
 ```
@@ -162,6 +165,8 @@ npm run build
 npm run typecheck
 npm test
 ```
+
+联机相关：`npm run race-server` 在本地启动中转（Vite 开发服务器把 `/ws` 代理到 8790 端口），`npm run build:server` 编译服务端，`npm run deploy:race` 发布中转服务。
 
 若引入 lint 或端到端工具，再提供 `npm run lint`、`npm run test:e2e`。不要添加没有实际配置或长期失败的占位脚本。
 

@@ -1,8 +1,18 @@
 import { GAME_HEIGHT, GAME_WIDTH } from "../game/config";
 import type { Eagle, GameState, Hazard, WorldSnapshot, WorldRect } from "../game/types";
-import { LAND_ANIMATION_DURATION_MS, selectCatPose } from "./cat-animation";
+
+// Render-only view of a race opponent (see src/net/race-controller.ts).
+export interface RaceGhost {
+  slot: number;
+  visible: boolean;
+  x: number;
+  y: number;
+  vy: number;
+  grounded: boolean;
+}
+import { LAND_ANIMATION_DURATION_MS, selectCatPose, type CatPose } from "./cat-animation";
 import { EffectLayer } from "./effects";
-import { PALETTE } from "./palette";
+import { CAT_COATS, PALETTE, type CatCoat } from "./palette";
 import {
   getRoofDecorationOffset,
   hasVentSteam,
@@ -36,7 +46,13 @@ export class Renderer {
     return this.logicalWidth;
   }
 
-  draw(snapshot: WorldSnapshot, gameState: GameState, reducedMotion: boolean): void {
+  draw(
+    snapshot: WorldSnapshot,
+    gameState: GameState,
+    reducedMotion: boolean,
+    ghosts: readonly RaceGhost[] = [],
+    coatSlot = 0,
+  ): void {
     const context = this.context;
     const nowMs = performance.now();
     context.save();
@@ -51,7 +67,8 @@ export class Renderer {
     if (gameState === "playing" && !reducedMotion) this.drawSpeedLines(snapshot.cat.vx, nowMs);
     this.drawPlatforms(snapshot, true, nowMs);
     this.drawFeatures(snapshot, reducedMotion, nowMs);
-    this.drawCat(snapshot, gameState, reducedMotion || gameState !== "playing", nowMs);
+    this.drawGhosts(ghosts, snapshot, reducedMotion, nowMs);
+    this.drawCat(snapshot, gameState, reducedMotion || gameState !== "playing", nowMs, CAT_COATS[coatSlot] ?? CAT_COATS[0]!);
     this.effects.draw(context, snapshot.cameraX, snapshot.cameraY, nowMs, reducedMotion);
     context.restore();
   }
@@ -447,6 +464,7 @@ export class Renderer {
     gameState: GameState,
     reducedMotion: boolean,
     nowMs: number,
+    coat: CatCoat,
   ): void {
     const { cat } = snapshot;
     const context = this.context;
@@ -460,8 +478,6 @@ export class Renderer {
       this.landingStartedAtMs,
       reducedMotion,
     );
-    const { bob, stretch, squash } = pose;
-
     if (
       this.landingStartedAtMs !== null &&
       nowMs - this.landingStartedAtMs >= LAND_ANIMATION_DURATION_MS
@@ -477,48 +493,7 @@ export class Renderer {
       context.translate(-(x + 10), -(y + 14));
     }
 
-    context.fillStyle = PALETTE.blackPurple;
-    context.fillRect(x - 4, y + 11 + bob + pose.tailLift, 7, 10);
-    context.fillRect(x - 7, y + 7 + bob + pose.tailLift, 5, 8);
-    context.fillRect(
-      x,
-      y + 9 + bob + stretch + squash,
-      19,
-      17 - stretch - squash,
-    );
-    context.fillRect(x + 13, y + 3 + bob, 14, 18);
-    context.fillRect(x + 15, y, 5, 7);
-    context.fillRect(x + 22, y + 1, 5, 7);
-
-    context.fillStyle = PALETTE.catOrange;
-    context.fillRect(x - 3, y + 12 + bob + pose.tailLift, 6, 7);
-    context.fillRect(x - 6, y + 8 + bob + pose.tailLift, 4, 7);
-    context.fillRect(
-      x + 1,
-      y + 10 + bob + stretch + squash,
-      17,
-      14 - stretch - squash,
-    );
-    context.fillRect(x + 14, y + 4 + bob, 12, 15);
-    context.fillRect(x + 16, y + 1, 3, 6);
-    context.fillRect(x + 23, y + 2, 3, 5);
-
-    context.fillStyle = PALETTE.catCream;
-    context.fillRect(x + 5, y + 16 + bob, 10, 7);
-    context.fillRect(x + 20, y + 11 + bob, 7, 6);
-    context.fillStyle = PALETTE.blackPurple;
-    context.fillRect(x + 22, y + 8 + bob, 2, pose.eyesWide ? 4 : 3);
-    context.fillStyle = PALETTE.scarfCoral;
-    context.fillRect(x + 12, y + 14 + bob + pose.scarfLift, 8, 4);
-    context.fillRect(x + 6, y + 15 + bob + pose.scarfLift, 7, 3);
-    context.fillRect(x + 2, y + 13 + bob + pose.scarfLift, 5, 3);
-
-    context.fillStyle = PALETTE.catOrange;
-    context.fillRect(x + 3, y + 22 + bob + pose.backLegOffset, 5, 5);
-    context.fillRect(x + 14, y + 22 + bob + pose.frontLegOffset, 5, 5);
-    context.fillStyle = PALETTE.catCream;
-    context.fillRect(x + 4, y + 25 + bob + pose.backLegOffset, 5, 2);
-    context.fillRect(x + 15, y + 25 + bob + pose.frontLegOffset, 5, 2);
+    this.drawCatSprite(x, y, pose, coat);
     if (angle !== 0) context.restore();
 
     // A gold star above the head while a mid-air jump is still available.
@@ -533,6 +508,99 @@ export class Renderer {
       context.fillRect(starX + 3, starY - 1, 1, 9);
       context.fillRect(starX + 2, starY + 1, 3, 5);
     }
+  }
+
+  // Opponents in a race: translucent, coloured by slot, with an edge marker
+  // when they run outside the visible window.
+  private drawGhosts(
+    ghosts: readonly RaceGhost[],
+    snapshot: WorldSnapshot,
+    reducedMotion: boolean,
+    nowMs: number,
+  ): void {
+    const context = this.context;
+    for (const ghost of ghosts) {
+      if (!ghost.visible) continue;
+      const coat = CAT_COATS[ghost.slot] ?? CAT_COATS[0]!;
+      const x = Math.round(ghost.x - snapshot.cameraX);
+      const y = Math.round(ghost.y - snapshot.cameraY);
+      if (x > this.logicalWidth || x + 24 < 0 || y > GAME_HEIGHT || y + 28 < 0) {
+        this.drawGhostMarker(x, y, coat);
+        continue;
+      }
+      const pose = selectCatPose("playing", ghost.grounded, ghost.vy, nowMs + ghost.slot * 97, null, reducedMotion);
+      context.globalAlpha = 0.5;
+      this.drawCatSprite(x, y, pose, coat);
+      context.globalAlpha = 1;
+      context.fillStyle = coat.tag;
+      context.fillRect(x + 6, y - 6, 12, 3);
+    }
+  }
+
+  private drawGhostMarker(x: number, y: number, coat: CatCoat): void {
+    const context = this.context;
+    const markerY = Math.max(96, Math.min(GAME_HEIGHT - 24, y + 10));
+    context.fillStyle = coat.tag;
+    if (x > this.logicalWidth) {
+      const edge = this.logicalWidth - 10;
+      context.fillRect(edge - 6, markerY - 6, 6, 12);
+      context.fillRect(edge, markerY - 3, 4, 6);
+    } else if (x + 24 < 0) {
+      context.fillRect(6, markerY - 3, 4, 6);
+      context.fillRect(10, markerY - 6, 6, 12);
+    } else {
+      // Above or below the view: a small chevron at the matching edge.
+      const markerX = Math.max(8, Math.min(this.logicalWidth - 20, x));
+      context.fillRect(markerX, y < 0 ? 100 : GAME_HEIGHT - 20, 12, 4);
+    }
+  }
+
+  // Shared by the local cat and translucent race ghosts.
+  private drawCatSprite(x: number, y: number, pose: CatPose, coat: CatCoat): void {
+    const context = this.context;
+    const { bob, stretch, squash } = pose;
+    context.fillStyle = PALETTE.blackPurple;
+    context.fillRect(x - 4, y + 11 + bob + pose.tailLift, 7, 10);
+    context.fillRect(x - 7, y + 7 + bob + pose.tailLift, 5, 8);
+    context.fillRect(
+      x,
+      y + 9 + bob + stretch + squash,
+      19,
+      17 - stretch - squash,
+    );
+    context.fillRect(x + 13, y + 3 + bob, 14, 18);
+    context.fillRect(x + 15, y, 5, 7);
+    context.fillRect(x + 22, y + 1, 5, 7);
+
+    context.fillStyle = coat.fur;
+    context.fillRect(x - 3, y + 12 + bob + pose.tailLift, 6, 7);
+    context.fillRect(x - 6, y + 8 + bob + pose.tailLift, 4, 7);
+    context.fillRect(
+      x + 1,
+      y + 10 + bob + stretch + squash,
+      17,
+      14 - stretch - squash,
+    );
+    context.fillRect(x + 14, y + 4 + bob, 12, 15);
+    context.fillRect(x + 16, y + 1, 3, 6);
+    context.fillRect(x + 23, y + 2, 3, 5);
+
+    context.fillStyle = coat.cream;
+    context.fillRect(x + 5, y + 16 + bob, 10, 7);
+    context.fillRect(x + 20, y + 11 + bob, 7, 6);
+    context.fillStyle = PALETTE.blackPurple;
+    context.fillRect(x + 22, y + 8 + bob, 2, pose.eyesWide ? 4 : 3);
+    context.fillStyle = PALETTE.scarfCoral;
+    context.fillRect(x + 12, y + 14 + bob + pose.scarfLift, 8, 4);
+    context.fillRect(x + 6, y + 15 + bob + pose.scarfLift, 7, 3);
+    context.fillRect(x + 2, y + 13 + bob + pose.scarfLift, 5, 3);
+
+    context.fillStyle = coat.fur;
+    context.fillRect(x + 3, y + 22 + bob + pose.backLegOffset, 5, 5);
+    context.fillRect(x + 14, y + 22 + bob + pose.frontLegOffset, 5, 5);
+    context.fillStyle = coat.cream;
+    context.fillRect(x + 4, y + 25 + bob + pose.backLegOffset, 5, 2);
+    context.fillRect(x + 15, y + 25 + bob + pose.frontLegOffset, 5, 2);
   }
 
   private positiveModulo(value: number, divisor: number): number {

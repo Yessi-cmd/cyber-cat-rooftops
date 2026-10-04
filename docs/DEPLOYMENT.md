@@ -11,6 +11,7 @@
 - Caddy 监听 80/443、申请源站证书、压缩响应并提供安全与缓存响应头。
 - 静态文件保存在 `/var/www/cyber-cat-rooftops/releases/<时间>-<commit>`。
 - `/var/www/cyber-cat-rooftops/current` 原子指向当前版本，服务器保留最近 5 个 release。
+- 联机竞速中转：systemd 服务 `cyber-cat-race`（`DynamicUser`、只读文件系统、128MB 内存上限）运行 `/opt/cyber-cat-race/current/server/main.js`，只监听 `127.0.0.1:8790`；Caddy 把 `/ws` 反代过去。同样保留最近 5 个 release。
 
 ## 首次安装
 
@@ -59,3 +60,17 @@ mv -Tf /var/www/cyber-cat-rooftops/current.next /var/www/cyber-cat-rooftops/curr
 ```
 
 静态文件切换不需要重启 Caddy。回滚后重新检查首页、哈希资源和核心游戏路径。
+
+## 联机竞速中转
+
+首次安装（仅一次）：
+
+1. `apt-get install -y nodejs`（Debian 12 官方源，跟随系统安全更新）。
+2. `install -d -m 0755 /opt/cyber-cat-race/releases`，并把 `deploy/cyber-cat-race.service` 放到 `/etc/systemd/system/`，然后执行 `systemctl daemon-reload && systemctl enable cyber-cat-race`。
+3. 上传新版 `deploy/Caddyfile.game.norliva.top`（新增 `reverse_proxy /ws 127.0.0.1:8790`，CSP 的 `connect-src` 放行 `wss://game.norliva.top`），先备份旧文件，`caddy validate` 通过后再 `systemctl reload caddy`。
+
+日常发布：`npm run deploy:race`。脚本会运行单测、编译服务端，打包 `build/server`、`build/shared` 和零依赖的 `node_modules/ws`，SCP 上传并校验 SHA-256，原子切换 `current` 后重启服务并检查是否处于运行状态。
+
+验证：`systemctl is-active cyber-cat-race`；用带 `Origin: https://game.norliva.top` 的 WebSocket 客户端连接 `wss://game.norliva.top/ws` 并发送 `{"t":"create"}`，应收到 `room` 消息；其他 Origin 应被 403 拒绝。
+
+回滚：把 `/opt/cyber-cat-race/current` 原子切回旧 release 后执行 `systemctl restart cyber-cat-race`。如需完全关闭联机，执行 `systemctl disable --now cyber-cat-race`：页面仍可单人游玩，房间界面会显示连接断开并提供「返回单人模式」。

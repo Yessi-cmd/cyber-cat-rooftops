@@ -6,10 +6,14 @@ import { GameSession } from "./game/session";
 import { GameStateMachine } from "./game/state-machine";
 import type { GameState, WorldSnapshot } from "./game/types";
 import { InputController, type InputAction } from "./input/input-controller";
+import { RaceController } from "./net/race-controller";
+import { raceServerUrl } from "./net/race-client";
 import { PALETTE } from "./render/palette";
 import { Renderer } from "./render/renderer";
 import { loadSave, saveBestScore, saveMuted } from "./storage/preferences";
 import { renderUiIcon } from "./ui/icons";
+import { renderRaceBoard, renderRaceOverlay, type BoardEntry, type RacePrimaryAction } from "./ui/race-panel";
+import { normalizeRoomCode } from "../shared/race-protocol.js";
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -34,6 +38,20 @@ class GameApp {
   private readonly hazardStatus = requiredElement<HTMLElement>("#hazard-status");
   private readonly comboElement = requiredElement<HTMLElement>("#combo-count");
   private readonly banner = requiredElement<HTMLElement>("#banner");
+  private readonly secondaryButton = requiredElement<HTMLButtonElement>("#secondary-button");
+  private readonly racePlayers = requiredElement<HTMLOListElement>("#race-players");
+  private readonly raceInvite = requiredElement<HTMLElement>("#race-invite");
+  private readonly raceLink = requiredElement<HTMLInputElement>("#race-link");
+  private readonly raceCopy = requiredElement<HTMLButtonElement>("#race-copy");
+  private readonly raceBoard = requiredElement<HTMLOListElement>("#race-board");
+  private readonly race = new RaceController(raceServerUrl(location), () => this.handleRaceChange());
+  private racePrimary: RacePrimaryAction = null;
+  private raceBoardKey = "";
+  private displayedCountdown = -1;
+  private announcedRoom: string | null = null;
+  private announcedResults = false;
+  private announcedPhase: string | null = null;
+  private readonly boardEntries: BoardEntry[] = [];
   private displayedCombo = -1;
   private bannerHideAt = 0;
   private announcedStage = 0;
@@ -69,6 +87,8 @@ class GameApp {
     this.session.setViewWidth(this.renderer.viewWidth);
     new InputController(this.shell, this.canvas, this.handleInput);
     this.primaryButton.addEventListener("click", this.handlePrimaryClick);
+    this.secondaryButton.addEventListener("click", this.handleSecondaryClick);
+    this.raceCopy.addEventListener("click", this.handleCopyInvite);
     this.pauseButton.addEventListener("click", this.handlePauseClick);
     this.soundButton.addEventListener("click", this.handleSoundClick);
     document.addEventListener("visibilitychange", this.handleVisibilityChange);
@@ -79,6 +99,8 @@ class GameApp {
       this.stateMachine.state,
       this.reducedMotion.matches,
     );
+    const invitedRoom = normalizeRoomCode(new URLSearchParams(location.search).get("room") ?? "");
+    if (invitedRoom !== null) this.race.join(invitedRoom);
     this.startLoop();
   }
 
@@ -93,6 +115,10 @@ class GameApp {
   private readonly tick = (time: number): void => {
     const frameDelta = Math.min((time - this.previousTime) / 1000, PHYSICS.maxFrameDelta);
     this.previousTime = time;
+    if (this.race.active) {
+      const raceSeed = this.race.takeStart();
+      if (raceSeed !== null) this.startRaceRun(raceSeed);
+    }
 
     if (this.stateMachine.state === "playing") {
       this.session.setViewWidth(this.renderer.viewWidth);
@@ -112,6 +138,7 @@ class GameApp {
     }
 
     const snapshot = this.session.snapshot();
+    if (this.race.active) this.updateRaceFrame(snapshot);
     if (snapshot.warning !== this.displayedWarning) {
       this.displayedWarning = snapshot.warning;
       this.hazardStatus.textContent = snapshot.warning ? CONTENT.warnings[snapshot.warning] : "";
@@ -135,8 +162,121 @@ class GameApp {
       this.comboElement.textContent = CONTENT.combo(snapshot.combo, snapshot.multiplier);
     }
     this.announceMilestones(snapshot, time);
-    this.renderer.draw(snapshot, this.stateMachine.state, this.reducedMotion.matches);
+    const view = this.race.view;
+    this.renderer.draw(
+      snapshot,
+      this.stateMachine.state,
+      this.reducedMotion.matches,
+      view === null ? [] : this.race.ghosts(),
+      view?.room ? view.you : 0,
+    );
     this.frameId = requestAnimationFrame(this.tick);
+  };
+
+  private updateRaceFrame(snapshot: WorldSnapshot): void {
+    const view = this.race.view!;
+    if (this.stateMachine.state === "playing") this.race.reportState(snapshot);
+    const countdown = this.race.countdownRemainingMs();
+    const seconds = countdown === null ? -1 : Math.ceil(countdown / 1000);
+    if (seconds !== this.displayedCountdown) {
+      this.displayedCountdown = seconds;
+      if (this.stateMachine.state !== "playing") this.renderUi();
+    }
+    const showBoard = view.phase === "racing" && this.stateMachine.state !== "ready";
+    this.raceBoard.hidden = !showBoard;
+    if (!showBoard) return;
+    const entries = this.boardEntries;
+    entries.length = 0;
+    const ghosts = this.race.ghosts();
+    for (const player of view.players) {
+      if (!player.inRace) continue;
+      const ghost = ghosts[player.slot];
+      const live = player.slot === view.you ? snapshot.score : ghost?.visible ? ghost.score : player.score;
+      entries.push({ slot: player.slot, score: Math.max(live, player.score), out: player.finished });
+    }
+    this.raceBoardKey = renderRaceBoard(this.raceBoard, entries, view.you, this.raceBoardKey);
+  }
+
+  private handleRaceChange(): void {
+    const view = this.race.view;
+    if (view === null) {
+      this.raceBoard.hidden = true;
+      this.announcedRoom = null;
+      this.announcedPhase = null;
+    } else {
+      if (view.room !== null && view.room !== this.announcedRoom) {
+        this.announcedRoom = view.room;
+        this.setRoomInUrl(view.room);
+        this.liveStatus.textContent = CONTENT.race.live.joined(view.room);
+      }
+      if (view.phase !== this.announcedPhase) {
+        this.announcedPhase = view.phase;
+        if (view.phase === "countdown") {
+          this.announcedResults = false;
+          this.liveStatus.textContent = CONTENT.race.live.countdown;
+        }
+      }
+      if (view.ranking !== null && !this.announcedResults) {
+        this.announcedResults = true;
+        const rank = view.ranking.findIndex(entry => entry.slot === view.you) + 1;
+        if (rank > 0) this.liveStatus.textContent = CONTENT.race.live.results(rank, view.ranking.length);
+      }
+    }
+    if (this.stateMachine.state !== "playing") this.renderUi();
+  }
+
+  private setRoomInUrl(room: string | null): void {
+    const url = new URL(location.href);
+    if (room === null) url.searchParams.delete("room");
+    else url.searchParams.set("room", room);
+    history.replaceState(history.state, "", url);
+  }
+
+  private inviteUrl(room: string): string {
+    return location.origin + location.pathname + "?room=" + room;
+  }
+
+  // Everyone in the race starts the same seed when their local countdown ends.
+  private startRaceRun(seed: number): void {
+    if (!this.race.racing) return;
+    const state = this.stateMachine.state;
+    if (state === "ready") this.stateMachine.send("start");
+    else if (state !== "playing") this.stateMachine.send("restart");
+    this.resetRun(seed);
+    this.audio.setAmbientActive(true);
+    this.showBanner(CONTENT.race.goBanner, performance.now());
+    this.renderUi();
+    // Started while backgrounded: wait for an explicit resume like any other interruption.
+    if (document.hidden) this.pauseForInterruption();
+  }
+
+  private readonly handleSecondaryClick = (): void => {
+    this.shell.focus({ preventScroll: true });
+    if (this.race.active) this.leaveRace();
+    else this.race.create();
+  };
+
+  private leaveRace(): void {
+    this.race.leave();
+    this.setRoomInUrl(null);
+    this.renderUi();
+  }
+
+  private readonly handleCopyInvite = (): void => {
+    const url = this.raceLink.value;
+    const done = (): void => {
+      this.raceCopy.textContent = CONTENT.race.copied;
+      this.liveStatus.textContent = CONTENT.race.copied;
+    };
+    if (typeof navigator.share === "function" && window.matchMedia("(pointer: coarse)").matches) {
+      void navigator.share({ title: document.title, url }).catch(() => undefined);
+      return;
+    }
+    if (navigator.clipboard !== undefined) {
+      void navigator.clipboard.writeText(url).then(done, () => this.raceLink.select());
+    } else {
+      this.raceLink.select();
+    }
   };
 
   private announceMilestones(snapshot: WorldSnapshot, time: number): void {
@@ -197,6 +337,8 @@ class GameApp {
       this.session.releaseJump();
       return;
     }
+    // In race mode the overlay buttons drive starts; taps only jump while running.
+    if (this.race.active && this.stateMachine.state !== "playing") return;
 
     switch (this.stateMachine.state) {
       case "ready":
@@ -220,6 +362,11 @@ class GameApp {
 
   private readonly handlePrimaryClick = (): void => {
     this.shell.focus({ preventScroll: true });
+    if (this.race.active && this.stateMachine.state !== "paused") {
+      if (this.racePrimary === "start") this.race.start();
+      else if (this.racePrimary === "solo") this.leaveRace();
+      return;
+    }
     if (this.stateMachine.state === "ready") {
       this.stateMachine.send("start");
       this.resetRunUi();
@@ -286,6 +433,7 @@ class GameApp {
       saveBestScore(score);
     }
     this.audio.play("fail");
+    this.race.reportFinish(score);
     const { cat } = this.session.snapshot();
     const now = performance.now();
     this.renderer.effects.shake(3, 260, now);
@@ -298,18 +446,22 @@ class GameApp {
     if (!this.stateMachine.send("restart")) {
       return;
     }
-    this.session.reset(this.createSeed());
+    this.resetRun(this.createSeed());
+    this.audio.setAmbientActive(true);
+    if (jumpImmediately) {
+      this.jump();
+    }
+    this.liveStatus.textContent = CONTENT.live.restarted;
+  }
+
+  private resetRun(seed: number): void {
+    this.session.reset(seed);
     this.lastGrounded = true;
     this.lastJumpCount = 0;
     this.lastCollectedCount = 0;
     this.lastPlatformId = 0;
     this.renderer.effects.clear();
     this.resetRunUi();
-    this.audio.setAmbientActive(true);
-    if (jumpImmediately) {
-      this.jump();
-    }
-    this.liveStatus.textContent = CONTENT.live.restarted;
   }
 
   private renderUi(): void {
@@ -327,6 +479,32 @@ class GameApp {
 
     this.overlay.hidden = false;
     this.result.hidden = true;
+
+    const view = this.race.view;
+    if (view !== null && state !== "paused") {
+      this.racePrimary = renderRaceOverlay({
+        title: this.overlayTitle,
+        copy: this.overlayCopy,
+        result: this.result,
+        players: this.racePlayers,
+        invite: this.raceInvite,
+        link: this.raceLink,
+        primary: this.primaryButton,
+        secondary: this.secondaryButton,
+      }, view, {
+        localScore: this.session.snapshot().score,
+        countdownMs: this.race.countdownRemainingMs(),
+        inviteUrl: view.room === null ? null : this.inviteUrl(view.room),
+      });
+      if (this.raceInvite.hidden) this.raceCopy.textContent = CONTENT.race.copyLink;
+      return;
+    }
+    this.racePlayers.hidden = true;
+    this.raceInvite.hidden = true;
+    this.primaryButton.hidden = false;
+    this.primaryButton.disabled = false;
+    this.secondaryButton.hidden = state === "paused";
+    this.secondaryButton.textContent = CONTENT.race.invite;
 
     const content = CONTENT.overlay[state as Exclude<GameState, "playing">];
     this.overlayTitle.textContent = content.title;

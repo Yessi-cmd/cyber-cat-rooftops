@@ -19,3 +19,18 @@ export const PALETTE = {
   smoke: "#a8b3a9",
   blackPurple: "#293b31",
 } as const;
+
+export interface CatCoat {
+  fur: string;
+  cream: string;
+  // HUD/marker colour with readable contrast on the light page.
+  tag: string;
+}
+
+// Race slots 0–3: orange, grey, black and white cats. Slot 0 is the solo cat.
+export const CAT_COATS: readonly CatCoat[] = [
+  { fur: PALETTE.catOrange, cream: PALETTE.catCream, tag: "#8a5a22" },
+  { fur: "#7d8782", cream: "#e9ece8", tag: "#55605a" },
+  { fur: "#3f4844", cream: "#cfd5cf", tag: "#26302b" },
+  { fur: "#ebe5d8", cream: "#fffaf0", tag: "#7a6a4b" },
+];
