@@ -17,7 +17,7 @@ export const CONTENT = {
   overlay: {
     ready: {
       title: "赛博小猫跳楼顶",
-      copy: "轻触或空格起跳，空中再按一次二段跳；近楼单跳、远楼二段跳；留意路障预警。",
+      copy: "按住跳得高，轻点是小跳；空中再按一次二段跳。吃到楼间鱼干再落地可叠连击加分，留意路障预警。",
       action: "开始跳跃",
     },
     paused: {
@@ -46,10 +46,18 @@ export const CONTENT = {
     gameOver: (score: number): string => `游戏结束，本局 ${score} 分`,
   },
   jumps: (count: number): string => `可跳 ${count}/2`,
-  controls: "空格 / ↑ / W 跳跃 · 空中再按二段跳 · P / Esc 暂停",
+  controls: "空格 / ↑ / W 跳跃（按住更高）· 空中再按二段跳 · P / Esc 暂停",
   loot: (count: number): string => `鱼干 × ${count}`,
+  combo: (count: number, multiplier: number): string =>
+    multiplier > 1 ? `连击 ${count} ×${multiplier}` : `连击 ${count}`,
+  banner: {
+    stage: (stage: number): string => (stage === 1 ? "提速！楼距拉远" : "全速冲刺！屋顶变窄"),
+    multiplier: (multiplier: number): string => `连击加成 ×${multiplier}！`,
+    record: "新纪录！",
+  },
   hazardWarning: "前方路障即将升起！",
   hazardFailure: "碰到路障了。提前起跳，越过条纹挡板。",
   result: (score: number, bestScore: number): string =>
     `本局 ${score} · 最高 ${bestScore}`,
+  bestCombo: (count: number): string => `最高连击 ${count}`,
 } as const;

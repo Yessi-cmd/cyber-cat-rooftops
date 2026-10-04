@@ -44,7 +44,10 @@
 
         <div class="hud">
           <div class="score-group">
-            <span id="score" aria-label="当前分数">0000</span>
+            <span class="score-row">
+              <span id="score" aria-label="当前分数">0000</span>
+              <span id="combo-count" aria-label="当前连击" hidden></span>
+            </span>
             <span id="jump-count" aria-label="剩余跳跃次数">可跳 2/2</span>
             <span id="loot-count" aria-label="收集鱼干数量">鱼干 × 0</span>
           </div>
@@ -55,6 +58,7 @@
         </div>
 
         <p id="hazard-status" role="status" aria-live="polite"></p>
+        <p id="banner" class="banner" aria-hidden="true" hidden></p>
 
         <div id="overlay" class="overlay">
           <div class="panel">
@@ -63,7 +67,7 @@
               <p id="eyebrow" class="eyebrow" data-document="brand">BREAK TIME</p>
             </div>
             <h1 id="overlay-title">赛博小猫跳楼顶</h1>
-            <p id="overlay-copy">轻触或空格起跳，空中再按一次二段跳；近楼单跳、远楼二段跳；留意路障预警。</p>
+            <p id="overlay-copy">按住跳得高，轻点是小跳；空中再按一次二段跳。吃到楼间鱼干再落地可叠连击加分，留意路障预警。</p>
             <p id="result" class="result" hidden></p>
             <button id="primary-button" class="primary-button" type="button">开始跳跃</button>
           </div>
@@ -73,7 +77,7 @@
         <p id="live-status" class="sr-only" aria-live="polite"></p>
       </section>
 
-      <p class="desktop-help">空格 / ↑ / W 跳跃 · 空中再按二段跳 · P / Esc 暂停</p>
+      <p class="desktop-help">空格 / ↑ / W 跳跃（按住更高）· 空中再按二段跳 · P / Esc 暂停</p>
       <footer class="document-footer" data-document="footer">不必赶进度，准备好了再继续。</footer>
       </article>
     </main>

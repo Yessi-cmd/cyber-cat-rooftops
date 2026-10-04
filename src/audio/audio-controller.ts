@@ -1,4 +1,12 @@
-export type SoundCue = "jump" | "land" | "score" | "fail" | "toggle" | "collect";
+export type SoundCue =
+  | "jump"
+  | "doubleJump"
+  | "land"
+  | "score"
+  | "fail"
+  | "toggle"
+  | "collect"
+  | "milestone";
 
 interface CueDefinition {
   frequencies: readonly number[];
@@ -20,6 +28,8 @@ export type AudioContextFactory = () => AudioContext;
 const CUES: Record<SoundCue, CueDefinition> = {
   collect: { frequencies: [880, 1100], duration: 0.08, gain: 0.02, type: "sine" },
   jump: { frequencies: [330, 520], duration: 0.09, gain: 0.035, type: "square" },
+  doubleJump: { frequencies: [520, 700, 880], duration: 0.1, gain: 0.03, type: "square" },
+  milestone: { frequencies: [523, 659, 784, 1046], duration: 0.28, gain: 0.03, type: "square" },
   land: { frequencies: [150, 110], duration: 0.07, gain: 0.025, type: "triangle" },
   score: { frequencies: [660, 880], duration: 0.11, gain: 0.025, type: "square" },
   fail: { frequencies: [220, 165, 110], duration: 0.24, gain: 0.032, type: "sawtooth" },
@@ -75,12 +85,13 @@ export class AudioController {
     this.syncAmbient();
   }
 
-  play(cue: SoundCue): void {
+  // `pitch` scales every note, e.g. to climb with the combo multiplier.
+  play(cue: SoundCue, pitch = 1): void {
     if (this.muted) {
       return;
     }
 
-    this.withRunningContext((context) => this.scheduleCue(context, CUES[cue]));
+    this.withRunningContext((context) => this.scheduleCue(context, CUES[cue], pitch));
   }
 
   private syncAmbient(): void {
@@ -201,7 +212,7 @@ export class AudioController {
     }
   }
 
-  private scheduleCue(context: AudioContext, cue: CueDefinition): void {
+  private scheduleCue(context: AudioContext, cue: CueDefinition, pitch: number): void {
     const start = context.currentTime;
     const segment = cue.duration / cue.frequencies.length;
 
@@ -212,7 +223,7 @@ export class AudioController {
       const segmentEnd = segmentStart + segment;
 
       oscillator.type = cue.type;
-      oscillator.frequency.setValueAtTime(frequency, segmentStart);
+      oscillator.frequency.setValueAtTime(frequency * pitch, segmentStart);
       gain.gain.setValueAtTime(0.0001, segmentStart);
       gain.gain.exponentialRampToValueAtTime(cue.gain, segmentStart + 0.008);
       gain.gain.exponentialRampToValueAtTime(0.0001, segmentEnd);

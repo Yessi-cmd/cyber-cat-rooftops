@@ -1,6 +1,7 @@
 import { GAME_HEIGHT, GAME_WIDTH } from "../game/config";
 import type { GameState, WorldSnapshot, WorldRect } from "../game/types";
 import { LAND_ANIMATION_DURATION_MS, selectCatPose } from "./cat-animation";
+import { EffectLayer } from "./effects";
 import { PALETTE } from "./palette";
 import {
   getRoofDecorationOffset,
@@ -15,6 +16,7 @@ export class Renderer {
   private dpr = 1;
   private logicalWidth = GAME_WIDTH;
   private landingStartedAtMs: number | null = null;
+  readonly effects = new EffectLayer();
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const context = canvas.getContext("2d");
@@ -42,14 +44,38 @@ export class Renderer {
     context.imageSmoothingEnabled = false;
     // Keep decorative layers still in the document-style presentation.
     this.drawSky(0, 0, true);
+    context.translate(
+      this.effects.shakeOffsetX(nowMs, reducedMotion),
+      this.effects.shakeOffsetY(nowMs, reducedMotion),
+    );
+    if (gameState === "playing" && !reducedMotion) this.drawSpeedLines(snapshot.cat.vx, nowMs);
     this.drawPlatforms(snapshot, true, nowMs);
     this.drawFeatures(snapshot);
     this.drawCat(snapshot, gameState, reducedMotion || gameState !== "playing", nowMs);
+    this.effects.draw(context, snapshot.cameraX, snapshot.cameraY, nowMs, reducedMotion);
     context.restore();
   }
 
   triggerLanding(nowMs = performance.now()): void {
     this.landingStartedAtMs = nowMs;
+  }
+
+  // Faint streaks once the run speed passes the opening pace; purely cosmetic.
+  private drawSpeedLines(runSpeed: number, nowMs: number): void {
+    const intensity = Math.min(1, Math.max(0, (runSpeed - 215) / 85));
+    if (intensity <= 0) return;
+    const context = this.context;
+    const span = this.logicalWidth + 120;
+    context.fillStyle = PALETTE.haze;
+    for (let index = 0; index < 7; index += 1) {
+      const lane = this.hash(index + 11);
+      const travel = (nowMs * (0.5 + lane * 0.4) + lane * span) % span;
+      const x = Math.round(this.logicalWidth + 40 - travel);
+      const y = Math.round(150 + this.hash(index + 31) * 420);
+      context.globalAlpha = 0.12 + 0.22 * intensity;
+      context.fillRect(x, y, Math.round(30 + 50 * intensity * lane), 2);
+    }
+    context.globalAlpha = 1;
   }
 
   private readonly resize = (): void => {
@@ -377,6 +403,14 @@ export class Renderer {
       this.landingStartedAtMs = null;
     }
 
+    const angle = this.effects.flipAngle(nowMs, reducedMotion);
+    if (angle !== 0) {
+      context.save();
+      context.translate(x + 10, y + 14);
+      context.rotate(angle);
+      context.translate(-(x + 10), -(y + 14));
+    }
+
     context.fillStyle = PALETTE.blackPurple;
     context.fillRect(x - 4, y + 11 + bob + pose.tailLift, 7, 10);
     context.fillRect(x - 7, y + 7 + bob + pose.tailLift, 5, 8);
@@ -419,6 +453,7 @@ export class Renderer {
     context.fillStyle = PALETTE.catCream;
     context.fillRect(x + 4, y + 25 + bob + pose.backLegOffset, 5, 2);
     context.fillRect(x + 15, y + 25 + bob + pose.frontLegOffset, 5, 2);
+    if (angle !== 0) context.restore();
   }
 
   private positiveModulo(value: number, divisor: number): number {

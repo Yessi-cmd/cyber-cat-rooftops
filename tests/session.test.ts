@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PHYSICS } from "../src/game/config";
+import { PHYSICS, ROOF_FEATURES, SCORE, comboMultiplier } from "../src/game/config";
 import { shouldJump } from "./helpers/auto-player";
 import { GameSession } from "../src/game/session";
 import type { Cat, WorldSnapshot } from "../src/game/types";
@@ -43,6 +43,93 @@ describe("GameSession", () => {
     session.jump();
     session.reset(19);
     expect(session.snapshot().cat.jumpsRemaining).toBe(2);
+  });
+
+  it("按住跳满弧线，轻点松手为矮跳但仍能越过路障，松手不影响下落", () => {
+    const apexHeight = (releaseAfterSteps: number | null): number => {
+      const session = new GameSession(5);
+      const cat = session.snapshot().cat;
+      const startY = cat.y;
+      let highest = startY;
+      session.jump();
+      for (let step = 0; step < 60; step += 1) {
+        if (step === releaseAfterSteps) session.releaseJump();
+        session.update(PHYSICS.fixedStep);
+        highest = Math.min(highest, cat.y);
+      }
+      return startY - highest;
+    };
+    const full = apexHeight(null);
+    const tap = apexHeight(6); // 50 ms tap
+    expect(full).toBeGreaterThan(74);
+    expect(tap).toBeLessThan(full * 0.6);
+    expect(tap).toBeGreaterThan(ROOF_FEATURES.hazardHeight + 8);
+    // Past the apex, releasing must not change the fall.
+    expect(apexHeight(40)).toBe(full);
+
+    const session = new GameSession(5);
+    const cat = session.snapshot().cat;
+    session.jump();
+    for (let step = 0; step < 45; step += 1) session.update(PHYSICS.fixedStep);
+    const vy = cat.vy;
+    session.update(PHYSICS.fixedStep);
+    expect(cat.vy - vy).toBeCloseTo(PHYSICS.fallGravity * PHYSICS.fixedStep);
+  });
+
+  it("缓冲跳在落地时沿用当前按住状态", () => {
+    const heights = [true, false].map(holdThrough => {
+      const session = new GameSession(5);
+      const cat = session.snapshot().cat;
+      session.jump();
+      session.jump();
+      while (!(cat.vy > 0 && cat.y > 620 - cat.height - 12)) session.update(PHYSICS.fixedStep);
+      session.jump(); // buffered: no jumps left while falling
+      if (!holdThrough) session.releaseJump();
+      while (!cat.grounded) session.update(PHYSICS.fixedStep);
+      let highest = cat.y;
+      for (let step = 0; step < 40; step += 1) {
+        session.update(PHYSICS.fixedStep);
+        highest = Math.min(highest, cat.y);
+      }
+      return 620 - cat.height - highest;
+    });
+    expect(heights[0]).toBeGreaterThan(70);
+    expect(heights[1]).toBeLessThan(heights[0]! * 0.6);
+  });
+
+  it("吃到楼距鱼干再落新屋顶才延续连击，漏吃清零，倍率封顶", () => {
+    expect([0, 3, 4, 8, 12, 99].map(comboMultiplier)).toEqual([1, 1, 2, 3, 4, SCORE.maxMultiplier]);
+
+    const run = (skipFishOnRoof: number | null) => {
+      const session = new GameSession(1);
+      const combos: number[] = [];
+      let last = 0;
+      for (let step = 0; step < 20 / PHYSICS.fixedStep; step += 1) {
+        const snapshot = session.snapshot();
+        for (const platform of snapshot.platforms) {
+          // Lift the chosen gap fish out of reach to simulate a missed arc.
+          const fish = platform.rewards?.find(reward => reward.gap);
+          if (platform.id === skipFishOnRoof && fish) fish.y = -10_000;
+        }
+        if (shouldJump(snapshot)) session.jump();
+        expect(session.update(PHYSICS.fixedStep)).toBe(false);
+        const { cat, combo } = session.snapshot();
+        if (cat.grounded && cat.platformId! > last) {
+          last = cat.platformId!;
+          combos.push(combo);
+        }
+      }
+      return { combos, snapshot: session.snapshot() };
+    };
+    const clean = run(null);
+    const missed = run(5);
+    expect(clean.combos.slice(0, 8)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(missed.combos[4]).toBe(0);
+    expect(missed.combos[5]).toBe(1);
+    expect(missed.snapshot.score).toBeLessThan(clean.snapshot.score);
+    expect(clean.snapshot.bestCombo).toBeGreaterThanOrEqual(8);
+    // Combo bonus and fish never change speed: same inputs, same cat path.
+    expect(missed.snapshot.cat.x).toBe(clean.snapshot.cat.x);
   });
 
   it("远间隙单跳会落空，顶点二段跳可以跨越并恢复次数", () => {

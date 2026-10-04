@@ -7,10 +7,17 @@ export function hasHazardRoof(id: number, score: number): boolean {
 }
 
 // Features use world coordinates and platform IDs, never viewport or wall-clock time.
-export function addRoofFeatures(previous: Platform, platform: Platform, hazardRoof: boolean, popup = false): Platform {
+export function addRoofFeatures(
+  previous: Platform,
+  platform: Platform,
+  hazardRoof: boolean,
+  popup = false,
+  hazardOffset: number = ROOF_FEATURES.hazardOffset,
+): Platform {
   const rewards: Reward[] = [];
-  const addReward = (centerX: number, centerY: number): void => {
+  const addReward = (centerX: number, centerY: number, gap = false): void => {
     rewards.push({
+      ...(gap ? { gap } : {}),
       x: Math.round(centerX - ROOF_FEATURES.rewardWidth / 2),
       y: Math.round(centerY - ROOF_FEATURES.rewardHeight / 2),
       width: ROOF_FEATURES.rewardWidth,
@@ -20,10 +27,10 @@ export function addRoofFeatures(previous: Platform, platform: Platform, hazardRo
   };
 
   const gapCenter = (previous.x + previous.width + platform.x) / 2;
-  addReward(gapCenter, Math.min(previous.y, platform.y) - (platform.gapKind === "far" ? 112 : 54));
+  addReward(gapCenter, Math.min(previous.y, platform.y) - (platform.gapKind === "far" ? 112 : 54), true);
 
   if (hazardRoof) {
-    const x = platform.x + ROOF_FEATURES.hazardOffset + (platform.id % 3) * 12;
+    const x = platform.x + hazardOffset + (platform.id % 3) * 12;
     platform.hazard = {
       x, y: platform.y - ROOF_FEATURES.hazardHeight,
       width: ROOF_FEATURES.hazardWidth, height: ROOF_FEATURES.hazardHeight,

@@ -1,4 +1,14 @@
-import { CAMERA, GAME_HEIGHT, GAME_WIDTH, PHYSICS, ROOF_FEATURES, SCORE, getDifficulty } from "./config";
+import {
+  CAMERA,
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  PHYSICS,
+  ROOF_FEATURES,
+  SCORE,
+  comboMultiplier,
+  getDifficulty,
+  stageAt,
+} from "./config";
 import { advancePopupHazards } from "./roof-features";
 import { sweptCatIntersects } from "./swept-collision";
 import { PlatformGenerator } from "./platform-generator";
@@ -21,12 +31,18 @@ export class GameSession {
   private cameraY = 0;
   private cameraTargetY = 0;
   private score = 0;
+  // Distance + landing bonus only; drives difficulty so rewards never speed the game up.
+  private progress = 0;
   private landingBonus = 0;
+  private comboBonus = 0;
+  private combo = 0;
+  private bestCombo = 0;
   private furthestPlatformId = START_PLATFORM.id;
   private viewWidth = GAME_WIDTH;
   private coyoteRemaining = 0;
   private jumpBufferRemaining = 0;
   private jumps = 0;
+  private jumpHeld = false;
   private collectedCount = 0;
   private failureReason: "fall" | "hazard" | null = null;
 
@@ -36,6 +52,7 @@ export class GameSession {
 
   clearPendingInput(): void {
     this.jumpBufferRemaining = 0;
+    this.jumpHeld = false;
   }
 
   constructor(seed = 1) {
@@ -51,18 +68,33 @@ export class GameSession {
     this.cameraY = 0;
     this.cameraTargetY = 0;
     this.score = 0;
+    this.progress = 0;
     this.coyoteRemaining = 0;
     this.jumpBufferRemaining = 0;
     this.jumps = 0;
+    this.jumpHeld = false;
     this.collectedCount = 0;
     this.failureReason = null;
     this.landingBonus = 0;
+    this.comboBonus = 0;
+    this.combo = 0;
+    this.bestCombo = 0;
     this.furthestPlatformId = START_PLATFORM.id;
     this.fillPlatforms();
   }
 
+  // A press: the arc stays full height until releaseJump() is called.
   jump(): boolean {
     if (this.failureReason !== null) return false;
+    this.jumpHeld = true;
+    return this.tryJump();
+  }
+
+  releaseJump(): void {
+    this.jumpHeld = false;
+  }
+
+  private tryJump(): boolean {
     if (this.cat.jumpsRemaining <= 0) {
       // With both jumps spent, only a near-landing press may be buffered.
       if (this.cat.vy > 0) this.jumpBufferRemaining = PHYSICS.jumpBufferSeconds;
@@ -92,8 +124,8 @@ export class GameSession {
   update(deltaSeconds: number): boolean {
     if (this.failureReason !== null) return true;
     const delta = Math.max(0, Math.min(deltaSeconds, PHYSICS.maxFrameDelta));
-    const difficulty = getDifficulty(this.score - this.collectedCount * ROOF_FEATURES.rewardPoints);
-    if (this.cat.grounded && this.jumpBufferRemaining > 0) this.jump();
+    const difficulty = getDifficulty(this.progress);
+    if (this.cat.grounded && this.jumpBufferRemaining > 0) this.tryJump();
     this.jumpBufferRemaining = Math.max(0, this.jumpBufferRemaining - delta);
     this.coyoteRemaining = Math.max(0, this.coyoteRemaining - delta);
     if (!this.cat.grounded && this.coyoteRemaining <= 0) {
@@ -119,18 +151,21 @@ export class GameSession {
       }
       this.cat.vy = 0;
     } else {
-      this.cat.vy += PHYSICS.gravity * delta;
+      const gravity = this.cat.vy >= 0
+        ? PHYSICS.fallGravity
+        : this.jumpHeld ? PHYSICS.gravity : PHYSICS.releasedRiseGravity;
+      this.cat.vy += gravity * delta;
       this.cat.y += this.cat.vy * delta;
       this.resolveLanding();
     }
 
     if (this.resolveFeatures()) return true;
 
-    this.score = Math.max(
-      this.score,
-      Math.floor(Math.max(0, this.cat.x - 70) / SCORE.distancePixelsPerPoint) +
-        this.landingBonus + this.collectedCount * ROOF_FEATURES.rewardPoints,
+    this.progress = Math.max(
+      this.progress,
+      Math.floor(Math.max(0, this.cat.x - 70) / SCORE.distancePixelsPerPoint) + this.landingBonus,
     );
+    this.score = this.progress + this.collectedCount * ROOF_FEATURES.rewardPoints + this.comboBonus;
 
     const horizontalLead = Math.max(CAMERA.horizontalLead, this.viewWidth * 0.28);
     this.cameraX = Math.max(this.cameraX, this.cat.x - horizontalLead);
@@ -158,6 +193,10 @@ export class GameSession {
       score: this.score,
       seed: this.seed,
       collectedCount: this.collectedCount,
+      combo: this.combo,
+      bestCombo: this.bestCombo,
+      multiplier: comboMultiplier(this.combo),
+      stage: stageAt(this.progress),
       hazardWarning: this.platforms.some(platform => platform.hazard?.popup?.phase === "warning"),
       failureReason: this.failureReason,
     };
@@ -240,6 +279,11 @@ export class GameSession {
       if (platform.id > this.furthestPlatformId) {
         this.landingBonus += SCORE.landingBonus;
         this.furthestPlatformId = platform.id;
+        const gapFish = platform.rewards?.find(reward => reward.gap);
+        this.combo = gapFish?.collected ? this.combo + 1 : 0;
+        this.bestCombo = Math.max(this.bestCombo, this.combo);
+        // Only the extra share is combo bonus; progress (difficulty) stays unaffected.
+        this.comboBonus += SCORE.landingBonus * (comboMultiplier(this.combo) - 1);
       }
       return;
     }

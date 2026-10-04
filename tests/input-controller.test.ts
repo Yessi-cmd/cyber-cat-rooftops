@@ -68,7 +68,21 @@ describe("InputController", () => {
     dispatch(canvas, "pointerdown", pointer);
     dispatch(canvas, "lostpointercapture", { pointerId: 1 });
     dispatch(canvas, "pointerdown", pointer);
-    expect(actions).toEqual(["jump", "jump", "jump"]);
+    dispatch(canvas, "pointerup", { pointerId: 1 });
+    dispatch(canvas, "lostpointercapture", { pointerId: 1 });
+    expect(actions).toEqual(["jump", "jumpRelease", "jump", "jumpRelease", "jump", "jumpRelease"]);
+  });
+
+  it("松开所有跳跃键才发出松手动作，未经跳跃的按键不会松手", () => {
+    const { shell, actions } = setup();
+    dispatch(shell, "keyup", { code: "Space" });
+    dispatch(shell, "keydown", { code: "Space" });
+    dispatch(shell, "keydown", { code: "ArrowUp" });
+    dispatch(shell, "keyup", { code: "Space" });
+    expect(actions).toEqual(["jump", "jump"]);
+    expect(dispatch(shell, "keyup", { code: "ArrowUp" }).defaultPrevented).toBe(true);
+    dispatch(shell, "keyup", { code: "KeyP" });
+    expect(actions).toEqual(["jump", "jump", "jumpRelease"]);
   });
 
   it("内部焦点移动不暂停，离开或失去焦点发出中断动作", () => {

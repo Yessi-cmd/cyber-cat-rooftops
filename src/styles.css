@@ -335,3 +335,19 @@ h1 {
 #jump-count, #loot-count { padding-inline: 8px; color: #71531a; font: 12px/1.3 ui-sans-serif, system-ui, sans-serif; letter-spacing: 0; }
 
 #hazard-status { position: absolute; top: 108px; left: 16px; right: 16px; margin: 0; color: #923f36; font: 600 13px/1.4 ui-sans-serif, system-ui, sans-serif; pointer-events: none; }
+
+.score-row { display: flex; align-items: center; gap: 6px; }
+#combo-count { padding: 5px 7px; color: #f4f5f3; background: #815b4e; border-radius: 3px; font: 700 12px/1 ui-monospace, monospace; letter-spacing: .04em; }
+#combo-count[data-tier="1"] { background: #986b38; }
+#combo-count[data-tier="2"] { background: #a24f45; }
+#combo-count[data-tier="3"] { background: #26372e; }
+
+.banner { position: absolute; z-index: 3; top: 30%; left: 50%; margin: 0; padding: 10px 18px; color: #f4f5f3; background: #26372ef0; border-radius: 4px; font: 700 20px/1.2 ui-monospace, monospace; letter-spacing: .08em; white-space: nowrap; pointer-events: none; transform: translateX(-50%); }
+.banner.is-showing { animation: banner-pop 1.4s ease-out both; }
+@keyframes banner-pop {
+  0% { opacity: 0; transform: translateX(-50%) scale(.7); }
+  12% { opacity: 1; transform: translateX(-50%) scale(1.12); }
+  22% { transform: translateX(-50%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+}

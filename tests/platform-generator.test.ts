@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { getDifficulty } from "../src/game/config";
+import {
+  MAX_ROOF_RISE,
+  MAX_RUN_SPEED,
+  PHYSICS,
+  ROOF_FEATURES,
+  getDifficulty,
+  hazardOffsetAt,
+  runSpeedAt,
+} from "../src/game/config";
 import {
   descendingFlightTime,
   doubleJumpFlightTime,
@@ -54,6 +62,41 @@ describe("PlatformGenerator", () => {
     }
   });
 
+  it("跑速随进度连续爬升、跨阶段不跳变并在后期封顶", () => {
+    expect(runSpeedAt(0)).toBe(PHYSICS.runSpeed);
+    let previous = runSpeedAt(0);
+    for (let score = 1; score <= 1500; score += 1) {
+      const speed = runSpeedAt(score);
+      expect(speed).toBeGreaterThanOrEqual(previous);
+      expect(speed - previous).toBeLessThan(0.5);
+      previous = speed;
+    }
+    expect(runSpeedAt(1100)).toBe(MAX_RUN_SPEED);
+    expect(runSpeedAt(5000)).toBe(MAX_RUN_SPEED);
+    // Popup warnings keep >= 0.9 s of lead even at the capped speed.
+    expect(ROOF_FEATURES.popupTriggerDistance / MAX_RUN_SPEED).toBeGreaterThanOrEqual(0.9);
+  });
+
+  it("远距落点越深，路障左侧留白随跑速放大", () => {
+    for (const speed of [200, 235, 270, MAX_RUN_SPEED]) {
+      const overshoot = doubleJumpFlightTime(0)! * speed - getDifficulty(1100).minGap;
+      expect(hazardOffsetAt(speed)).toBeGreaterThanOrEqual(overshoot + speed * 0.3);
+    }
+    for (let seed = 1; seed <= 50; seed += 1) {
+      const generator = new PlatformGenerator(seed);
+      let previous = start;
+      for (let index = 0; index < 60; index += 1) {
+        const score = index * 25;
+        const next = generator.next(previous, score);
+        if (next.hazard) {
+          expect(next.hazard.x - next.x).toBeGreaterThanOrEqual(hazardOffsetAt(getDifficulty(score).runSpeed));
+          expect(next.x + next.width - next.hazard.x - next.hazard.width).toBeGreaterThanOrEqual(172);
+        }
+        previous = next;
+      }
+    }
+  });
+
   it("同一随机种子生成同一序列", () => {
     const generate = (): Platform[] => {
       const generator = new PlatformGenerator(20260718);
@@ -75,6 +118,7 @@ describe("PlatformGenerator", () => {
     for (let seed = 1; seed <= 300; seed += 1) {
       const generator = new PlatformGenerator(seed);
       let previous = start;
+      let deepest = start.y;
       for (let index = 0; index < 80; index += 1) {
         const score = index * 20;
         const difficulty = getDifficulty(score);
@@ -87,6 +131,8 @@ describe("PlatformGenerator", () => {
           isPlatformReachableWithoutJump(previous, next, difficulty.runSpeed),
           `requires jump: seed=${seed}, index=${index}`,
         ).toBe(false);
+        expect(next.y, `climb: seed=${seed}, index=${index}`).toBeGreaterThanOrEqual(deepest - MAX_ROOF_RISE);
+        deepest = Math.max(deepest, next.y);
         previous = next;
       }
     }

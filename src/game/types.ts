@@ -23,6 +23,8 @@ export interface WorldRect {
 
 export interface Reward extends WorldRect {
   collected: boolean;
+  // The fish arcing over the gap before this roof; it feeds the combo.
+  gap?: boolean;
 }
 
 export type GapKind = "near" | "medium" | "far";
@@ -50,6 +52,10 @@ export interface WorldSnapshot {
   score: number;
   seed: number;
   collectedCount: number;
+  combo: number;
+  bestCombo: number;
+  multiplier: number;
+  stage: number;
   hazardWarning: boolean;
   failureReason: "fall" | "hazard" | null;
 }
