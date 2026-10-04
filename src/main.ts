@@ -30,6 +30,8 @@ class GameApp {
   private readonly soundButton = requiredElement<HTMLButtonElement>("#sound-button");
   private readonly lootElement = requiredElement<HTMLElement>("#loot-count");
   private readonly jumpElement = requiredElement<HTMLElement>("#jump-count");
+  private readonly hazardStatus = requiredElement<HTMLElement>("#hazard-status");
+  private displayedWarning = false;
   private displayedJumps = -1;
   private displayedLoot = -1;
   private lastCollectedCount = 0;
@@ -101,6 +103,10 @@ class GameApp {
     }
 
     const snapshot = this.session.snapshot();
+    if (snapshot.hazardWarning !== this.displayedWarning) {
+      this.displayedWarning = snapshot.hazardWarning;
+      this.hazardStatus.textContent = snapshot.hazardWarning ? CONTENT.hazardWarning : "";
+    }
     if (snapshot.score !== this.displayedScore) {
       this.displayedScore = snapshot.score;
       this.scoreElement.textContent = snapshot.score.toString().padStart(4, "0");

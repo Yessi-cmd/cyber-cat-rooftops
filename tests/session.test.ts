@@ -49,6 +49,9 @@ describe("GameSession", () => {
     for (const useSecondJump of [false, true]) {
       const session = new GameSession(42);
       const cat = session.snapshot().cat as Cat;
+      // Isolate a known far gap; the generated opening is deliberately a near gap.
+      session.snapshot().platforms[1]!.x = 418;
+      session.snapshot().platforms[1]!.y = 620;
       cat.x = 240;
       session.jump();
       for (let frame = 0; frame < 34; frame += 1) session.update(PHYSICS.fixedStep);

@@ -1,5 +1,5 @@
 import { ROOF_FEATURES } from "./config";
-import type { Platform, Reward } from "./types";
+import type { Cat, Platform, Reward } from "./types";
 
 export function hasHazardRoof(id: number, score: number): boolean {
   return id >= ROOF_FEATURES.firstHazardId &&
@@ -7,7 +7,7 @@ export function hasHazardRoof(id: number, score: number): boolean {
 }
 
 // Features use world coordinates and platform IDs, never viewport or wall-clock time.
-export function addRoofFeatures(previous: Platform, platform: Platform, hazardRoof: boolean): Platform {
+export function addRoofFeatures(previous: Platform, platform: Platform, hazardRoof: boolean, popup = false): Platform {
   const rewards: Reward[] = [];
   const addReward = (centerX: number, centerY: number): void => {
     rewards.push({
@@ -20,13 +20,14 @@ export function addRoofFeatures(previous: Platform, platform: Platform, hazardRo
   };
 
   const gapCenter = (previous.x + previous.width + platform.x) / 2;
-  addReward(gapCenter, Math.min(previous.y, platform.y) - 112);
+  addReward(gapCenter, Math.min(previous.y, platform.y) - (platform.gapKind === "far" ? 112 : 54));
 
   if (hazardRoof) {
     const x = platform.x + ROOF_FEATURES.hazardOffset + (platform.id % 3) * 12;
     platform.hazard = {
       x, y: platform.y - ROOF_FEATURES.hazardHeight,
       width: ROOF_FEATURES.hazardWidth, height: ROOF_FEATURES.hazardHeight,
+      ...(popup ? { popup: { phase: "hidden" as const, elapsed: 0 } } : {}),
     };
     addReward(x - 20, platform.y - 46);
     addReward(x + 16, platform.y - 72);
@@ -34,4 +35,22 @@ export function addRoofFeatures(previous: Platform, platform: Platform, hazardRo
   }
   platform.rewards = rewards;
   return platform;
+}
+
+// Simulation time only: pausing stops the warning; viewport and wall-clock never affect it.
+export function advancePopupHazards(platforms: readonly Platform[], cat: Readonly<Cat>, delta: number): void {
+  for (const platform of platforms) {
+    const hazard = platform.hazard;
+    const popup = hazard?.popup;
+    if (!hazard || !popup || popup.phase === "active") continue;
+    if (popup.phase === "hidden") {
+      if (hazard.x - cat.x - cat.width <= ROOF_FEATURES.popupTriggerDistance) {
+        popup.phase = "warning";
+        popup.elapsed = 0;
+      }
+    } else {
+      popup.elapsed += delta;
+      if (popup.elapsed >= ROOF_FEATURES.popupWarningSeconds) popup.phase = "active";
+    }
+  }
 }

@@ -25,13 +25,20 @@ export interface Reward extends WorldRect {
   collected: boolean;
 }
 
+export type GapKind = "near" | "medium" | "far";
+
+export interface Hazard extends WorldRect {
+  popup?: { phase: "hidden" | "warning" | "active"; elapsed: number };
+}
+
 export interface Platform {
   id: number;
   x: number;
   y: number;
   width: number;
   height: number;
-  hazard?: WorldRect;
+  gapKind?: GapKind;
+  hazard?: Hazard;
   rewards?: Reward[];
 }
 
@@ -43,5 +50,6 @@ export interface WorldSnapshot {
   score: number;
   seed: number;
   collectedCount: number;
+  hazardWarning: boolean;
   failureReason: "fall" | "hazard" | null;
 }

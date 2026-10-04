@@ -1,4 +1,5 @@
 import { CAMERA, GAME_HEIGHT, GAME_WIDTH, PHYSICS, ROOF_FEATURES, SCORE, getDifficulty } from "./config";
+import { advancePopupHazards } from "./roof-features";
 import { sweptCatIntersects } from "./swept-collision";
 import { PlatformGenerator } from "./platform-generator";
 import type { Cat, Platform, WorldSnapshot } from "./types";
@@ -100,6 +101,7 @@ export class GameSession {
       this.cat.jumpsRemaining = Math.min(1, this.cat.jumpsRemaining);
     }
     this.cat.vx = difficulty.runSpeed;
+    advancePopupHazards(this.platforms, this.cat, delta);
     this.cat.previousX = this.cat.x;
     this.cat.previousY = this.cat.y;
     this.cat.x += this.cat.vx * delta;
@@ -156,13 +158,14 @@ export class GameSession {
       score: this.score,
       seed: this.seed,
       collectedCount: this.collectedCount,
+      hazardWarning: this.platforms.some(platform => platform.hazard?.popup?.phase === "warning"),
       failureReason: this.failureReason,
     };
   }
 
   private resolveFeatures(): boolean {
     for (const platform of this.platforms) {
-      if (platform.hazard && sweptCatIntersects(this.cat, platform.hazard)) {
+      if (platform.hazard && (!platform.hazard.popup || platform.hazard.popup.phase === "active") && sweptCatIntersects(this.cat, platform.hazard)) {
         this.failureReason = "hazard";
         this.clearPendingInput();
         return true;

@@ -26,6 +26,8 @@ export const SCORE = {
 
 export const ROOF_FEATURES = {
   firstHazardId: 3,
+  popupTriggerDistance: 243, // px: at least 0.9s ahead at the fastest run speed.
+  popupWarningSeconds: 0.35,
   hazardPlatformWidth: 340,
   hazardWidth: 24,
   hazardHeight: 20,
@@ -41,7 +43,11 @@ export const CAMERA = {
   baseScrollSpeed: 80,
 } as const;
 
+// Seconds of horizontal travel; far gaps retain the two-jump challenge ranges.
+export const GAP_RANGES = { near: [0.32, 0.40], medium: [0.43, 0.49] } as const;
+
 export interface Difficulty {
+  // Far gap range; near/medium use the speed-scaled ranges above.
   minGap: number;
   maxGap: number;
   minYOffset: number;

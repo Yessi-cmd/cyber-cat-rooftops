@@ -333,3 +333,5 @@ h1 {
 
 .score-group { display: grid; gap: 3px; }
 #jump-count, #loot-count { padding-inline: 8px; color: #71531a; font: 12px/1.3 ui-sans-serif, system-ui, sans-serif; letter-spacing: 0; }
+
+#hazard-status { position: absolute; top: 108px; left: 16px; right: 16px; margin: 0; color: #923f36; font: 600 13px/1.4 ui-sans-serif, system-ui, sans-serif; pointer-events: none; }

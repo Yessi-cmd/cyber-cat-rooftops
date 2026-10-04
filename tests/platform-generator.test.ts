@@ -12,7 +12,7 @@ import type { Platform } from "../src/game/types";
 const start: Platform = { id: 0, x: 0, y: 620, width: 260, height: 42 };
 
 describe("PlatformGenerator", () => {
-  it("楼距超过单跳范围，二段跳保留明确余量，后期平台更短", () => {
+  it("远楼距超过单跳范围，二段跳保留明确余量，后期平台更短", () => {
     const difficulty = getDifficulty(0);
     const flightTime = doubleJumpFlightTime(0);
     expect(flightTime).not.toBeNull();
@@ -28,6 +28,30 @@ describe("PlatformGenerator", () => {
     const expert = getDifficulty(500);
     expect(expert.maxWidth / expert.runSpeed).toBeLessThan(0.47);
     expect(expert.runSpeed).toBeGreaterThan(difficulty.runSpeed * 1.3);
+  });
+
+  it("每组包含近中远三种楼距，近中可单跳，远距保留二段跳挑战", () => {
+    for (const score of [0, 150, 500]) {
+      for (let seed = 1; seed <= 100; seed += 1) {
+        const generator = new PlatformGenerator(seed);
+        const speed = getDifficulty(score).runSpeed;
+        let previous = generator.next(start, score);
+        expect(previous.gapKind).toBe("near");
+        for (let group = 0; group < 8; group += 1) {
+          const kinds = new Set<string>();
+          for (let index = 0; index < 3; index += 1) {
+            const next = generator.next(previous, score);
+            kinds.add(next.gapKind!);
+            const gap = next.x - previous.x - previous.width;
+            const singleReach = descendingFlightTime(next.y - previous.y)! * speed;
+            if (next.gapKind === "far") expect(gap).toBeGreaterThan(singleReach);
+            else expect(gap + 14).toBeLessThanOrEqual(singleReach);
+            previous = next;
+          }
+          expect([...kinds].sort()).toEqual(["far", "medium", "near"]);
+        }
+      }
+    }
   });
 
   it("同一随机种子生成同一序列", () => {

@@ -1,7 +1,7 @@
-import { MIN_ROOF_WORLD_Y, PHYSICS, ROOF_FEATURES, getDifficulty } from "./config";
+import { GAP_RANGES, MIN_ROOF_WORLD_Y, PHYSICS, ROOF_FEATURES, getDifficulty } from "./config";
 import { SeededRandom } from "./random";
 import { addRoofFeatures, hasHazardRoof } from "./roof-features";
-import type { Platform } from "./types";
+import type { GapKind, Platform } from "./types";
 
 const REACH_SAFETY = 14;
 
@@ -60,6 +60,7 @@ export function isPlatformReachableWithoutJump(
 export class PlatformGenerator {
   private readonly random: SeededRandom;
   private nextId = 1;
+  private gapBag: GapKind[] = ["near"];
 
   constructor(seed: number) {
     this.random = new SeededRandom(seed);
@@ -68,14 +69,26 @@ export class PlatformGenerator {
   next(previous: Platform, score: number): Platform {
     const difficulty = getDifficulty(score);
     const hazardRoof = hasHazardRoof(this.nextId, score);
+    if (this.gapBag.length === 0) {
+      this.gapBag = ["near", "medium", "far"];
+      for (let index = this.gapBag.length - 1; index > 0; index -= 1) {
+        const other = Math.floor(this.random.next() * (index + 1));
+        [this.gapBag[index], this.gapBag[other]] = [this.gapBag[other]!, this.gapBag[index]!];
+      }
+    }
+    const gapKind = this.gapBag.pop()!;
+    const minGap = gapKind === "far" ? difficulty.minGap : Math.round(GAP_RANGES[gapKind][0] * difficulty.runSpeed);
+    const maxGap = gapKind === "far" ? difficulty.maxGap : Math.round(GAP_RANGES[gapKind][1] * difficulty.runSpeed);
+    const popup = hazardRoof && (this.nextId === 3 || this.random.next() < 0.55);
 
     for (let attempt = 0; attempt < 24; attempt += 1) {
-      const gap = Math.round(this.random.between(difficulty.minGap, difficulty.maxGap));
+      const gap = Math.round(this.random.between(minGap, maxGap));
       const yOffset = Math.round(
         this.random.between(difficulty.minYOffset, difficulty.maxYOffset),
       );
       const candidate: Platform = {
         id: this.nextId,
+        gapKind,
         x: previous.x + previous.width + gap,
         y: Math.max(MIN_ROOF_WORLD_Y, previous.y + yOffset),
         width: hazardRoof
@@ -87,21 +100,23 @@ export class PlatformGenerator {
       if (
         // Progress is estimated at the departure roof, independently of lookahead.
         isPlatformReachableAtSpeed(previous, candidate, difficulty.runSpeed) &&
+        (gapKind === "far" || (descendingFlightTime(candidate.y - previous.y) ?? 0) * difficulty.runSpeed >= gap + REACH_SAFETY) &&
         !isPlatformReachableWithoutJump(previous, candidate, difficulty.runSpeed)
       ) {
         this.nextId += 1;
-        return addRoofFeatures(previous, candidate, hazardRoof);
+        return addRoofFeatures(previous, candidate, hazardRoof, popup);
       }
     }
 
     const fallback: Platform = {
       id: this.nextId,
-      x: previous.x + previous.width + difficulty.minGap,
+      gapKind,
+      x: previous.x + previous.width + minGap,
       y: previous.y,
       width: hazardRoof ? ROOF_FEATURES.hazardPlatformWidth : difficulty.maxWidth,
       height: 36,
     };
     this.nextId += 1;
-    return addRoofFeatures(previous, fallback, hazardRoof);
+    return addRoofFeatures(previous, fallback, hazardRoof, popup);
   }
 }

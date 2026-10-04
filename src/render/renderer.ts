@@ -213,23 +213,36 @@ export class Renderer {
   private drawFeatures(snapshot: WorldSnapshot): void {
     const context = this.context;
     for (const platform of snapshot.platforms) {
-      if (platform.hazard) {
+      if (platform.hazard && platform.hazard.popup?.phase !== "hidden") {
         const x = Math.round(platform.hazard.x - snapshot.cameraX);
         const y = Math.round(platform.hazard.y - snapshot.cameraY);
         if (x + platform.hazard.width >= 0 && x <= this.logicalWidth) {
-          context.fillStyle = PALETTE.hazard;
-          context.fillRect(x, y, platform.hazard.width, platform.hazard.height);
-          context.fillStyle = PALETTE.catCream;
-          // Diagonal warning bands distinguish solid hazards from harmless props.
-          for (let band = 0; band < 3; band += 1) {
-            context.fillRect(x + 2 + band * 7, y + 3, 3, 5);
-            context.fillRect(x + 4 + band * 7, y + 8, 3, 5);
+          if (platform.hazard.popup?.phase === "warning") {
+            // Static outline and ! remain legible with mute and reduced motion.
+            context.strokeStyle = PALETTE.hazard;
+            context.lineWidth = 2;
+            context.strokeRect(x, y, platform.hazard.width, platform.hazard.height);
+            context.fillStyle = PALETTE.hazard;
+            context.fillRect(x + 10, y - 24, 4, 12);
+            context.fillRect(x + 10, y - 8, 4, 4);
+          } else {
+            context.fillStyle = PALETTE.hazard;
+            context.fillRect(x, y, platform.hazard.width, platform.hazard.height);
+            context.fillStyle = PALETTE.catCream;
+            // Diagonal warning bands distinguish solid hazards from harmless props.
+            for (let band = 0; band < 3; band += 1) {
+              context.fillRect(x + 2 + band * 7, y + 3, 3, 5);
+              context.fillRect(x + 4 + band * 7, y + 8, 3, 5);
+            }
+            context.fillStyle = PALETTE.blackPurple;
+            context.fillRect(x, y + platform.hazard.height - 3, platform.hazard.width, 3);
           }
-          context.fillStyle = PALETTE.blackPurple;
-          context.fillRect(x, y + platform.hazard.height - 3, platform.hazard.width, 3);
         }
       }
-      for (const reward of platform.rewards ?? []) {
+      const rewards = platform.rewards;
+      for (let index = 0; rewards && index < rewards.length; index += 1) {
+        const reward = rewards[index]!;
+        if (index > 0 && platform.hazard?.popup?.phase === "hidden") continue;
         if (!reward.collected) this.drawReward(reward, snapshot.cameraX, snapshot.cameraY);
       }
     }
