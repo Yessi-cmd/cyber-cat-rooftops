@@ -3,13 +3,14 @@ import {
   MAX_ROOF_RISE,
   MIN_ROOF_WORLD_Y,
   PHYSICS,
+  POWERS,
   ROOF_FEATURES,
   getDifficulty,
   hazardOffsetAt,
 } from "./config";
 import { SeededRandom } from "./random";
 import { addRoofFeatures, hasHazardRoof } from "./roof-features";
-import type { GapKind, Platform, RoofFeatureKind } from "./types";
+import type { GapKind, Platform, PowerKind, RoofFeatureKind } from "./types";
 
 // First appearances are fixed so each obstacle is introduced alone.
 const INTRODUCED_FEATURES: Readonly<Record<number, RoofFeatureKind>> = { 3: "barrier", 7: "tower", 11: "eagle" };
@@ -76,6 +77,7 @@ export class PlatformGenerator {
   private nextId = 1;
   private gapBag: GapKind[] = ["near"];
   private deepestY = 0;
+  private lastPowerId = Number.NEGATIVE_INFINITY;
 
   constructor(seed: number) {
     this.random = new SeededRandom(seed);
@@ -125,7 +127,7 @@ export class PlatformGenerator {
         !isPlatformReachableWithoutJump(previous, candidate, difficulty.runSpeed)
       ) {
         this.nextId += 1;
-        return addRoofFeatures(previous, candidate, feature, popup, hazardOffset);
+        return this.addPower(addRoofFeatures(previous, candidate, feature, popup, hazardOffset));
       }
     }
 
@@ -138,7 +140,36 @@ export class PlatformGenerator {
       height: 36,
     };
     this.nextId += 1;
-    return addRoofFeatures(previous, fallback, feature, popup, hazardOffset);
+    return this.addPower(addRoofFeatures(previous, fallback, feature, popup, hazardOffset));
+  }
+
+  // Power-ups only float over plain roofs, centred, never two close together.
+  private addPower(platform: Platform): Platform {
+    if (
+      platform.hazard !== undefined || platform.eagle !== undefined ||
+      platform.id < POWERS.firstRoofId || platform.id - this.lastPowerId < POWERS.minRoofSpacing
+    ) {
+      return platform;
+    }
+    if (this.random.next() >= POWERS.chance) return platform;
+    const entries = Object.entries(POWERS.weights) as [PowerKind, number][];
+    let roll = this.random.next() * entries.reduce((sum, [, weight]) => sum + weight, 0);
+    let kind = entries[0]![0];
+    for (const [candidate, weight] of entries) {
+      kind = candidate;
+      roll -= weight;
+      if (roll < 0) break;
+    }
+    this.lastPowerId = platform.id;
+    platform.power = {
+      kind,
+      x: Math.round(platform.x + platform.width / 2 - POWERS.itemSize / 2),
+      y: Math.round(platform.y - POWERS.itemLift - POWERS.itemSize / 2),
+      width: POWERS.itemSize,
+      height: POWERS.itemSize,
+      collected: false,
+    };
+    return platform;
   }
 
   private pickFeature(id: number): RoofFeatureKind {

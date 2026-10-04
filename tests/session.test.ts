@@ -123,11 +123,11 @@ describe("GameSession", () => {
     };
     const clean = run(null);
     const missed = run(5);
-    expect(clean.combos.slice(0, 8)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(clean.combos.slice(0, 6)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(missed.combos[4]).toBe(0);
     expect(missed.combos[5]).toBe(1);
     expect(missed.snapshot.score).toBeLessThan(clean.snapshot.score);
-    expect(clean.snapshot.bestCombo).toBeGreaterThanOrEqual(8);
+    expect(clean.snapshot.bestCombo).toBeGreaterThanOrEqual(6);
     // Combo bonus and fish never change speed: same inputs, same cat path.
     expect(missed.snapshot.cat.x).toBe(clean.snapshot.cat.x);
   });

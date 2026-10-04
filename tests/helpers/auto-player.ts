@@ -17,7 +17,8 @@ function heldLandingTime(vy: number, drop: number): number | null {
 export function shouldJump(snapshot: WorldSnapshot): boolean {
   const { cat, platforms } = snapshot;
   if (!cat.grounded) {
-    if (cat.jumpsRemaining !== 1) return false;
+    // Use at most the normal double jump; a feather's extra jump stays in reserve.
+    if (cat.jumpsRemaining - (snapshot.powers.feather > 0 ? 1 : 0) < 1) return false;
     const landingAhead = platforms.some(p => {
       const time = heldLandingTime(cat.vy, p.y - cat.y - cat.height);
       if (time === null) return false;

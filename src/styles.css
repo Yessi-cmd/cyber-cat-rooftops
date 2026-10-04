@@ -368,3 +368,8 @@ h1 {
 .race-board li { display: flex; align-items: center; gap: 5px; padding: 3px 6px; background: #f4f5f3e8; border-radius: 3px; font: 12px/1.2 ui-monospace, monospace; }
 .race-board li[data-you="true"] { font-weight: 700; }
 .race-board li[data-out="true"] { opacity: .55; text-decoration: line-through; }
+
+.power-list { display: flex; flex-wrap: wrap; gap: 4px; max-width: 220px; }
+.power-list:empty { display: none; }
+.power-chip { padding: 3px 6px; color: #fff; border-radius: 3px; font: 700 11px/1.2 ui-monospace, monospace; letter-spacing: 0; }
+.power-chip[data-ending="true"] { opacity: .65; }

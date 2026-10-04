@@ -3,16 +3,25 @@ import {
   GAME_HEIGHT,
   GAME_WIDTH,
   PHYSICS,
+  POWERS,
   ROOF_FEATURES,
   SCORE,
   comboMultiplier,
   getDifficulty,
   stageAt,
 } from "./config";
+import {
+  emptyPowerTimers,
+  maxJumpsFor,
+  powerDuration,
+  pullRewards,
+  rocketReleaseTarget,
+  rocketTargetY,
+} from "./powers";
 import { advancePopupHazards, placeEagle } from "./roof-features";
 import { sweptCatIntersects } from "./swept-collision";
 import { PlatformGenerator } from "./platform-generator";
-import type { Cat, FailureReason, Platform, WorldSnapshot } from "./types";
+import type { Cat, FailureReason, Platform, PowerKind, PowerTimers, WorldSnapshot } from "./types";
 
 const START_PLATFORM: Platform = {
   id: 0,
@@ -21,6 +30,12 @@ const START_PLATFORM: Platform = {
   width: 260,
   height: 42,
 };
+
+// Snap float residue from many fixed steps to exactly zero.
+function countDown(remaining: number, delta: number): number {
+  const next = remaining - delta;
+  return next > 1e-6 ? next : 0;
+}
 
 export class GameSession {
   private seed = 1;
@@ -45,6 +60,17 @@ export class GameSession {
   private jumpHeld = false;
   private collectedCount = 0;
   private failureReason: FailureReason | null = null;
+  private powers: PowerTimers = emptyPowerTimers();
+  // After the rocket timer ends the cat keeps flying until a safe drop exists.
+  private rocketSeeking = false;
+  private rocketSeekTime = 0;
+  private grace = 0;
+  private powerBonus = 0;
+  private powerPickups = 0;
+  private lastPower: PowerKind | null = null;
+  private shieldBreaks = 0;
+  // A rocket skips gaps without their fish; don't let that break the combo.
+  private keepCombo = false;
 
   get jumpCount(): number {
     return this.jumps;
@@ -80,6 +106,15 @@ export class GameSession {
     this.combo = 0;
     this.bestCombo = 0;
     this.furthestPlatformId = START_PLATFORM.id;
+    this.powers = emptyPowerTimers();
+    this.rocketSeeking = false;
+    this.rocketSeekTime = 0;
+    this.grace = 0;
+    this.powerBonus = 0;
+    this.powerPickups = 0;
+    this.lastPower = null;
+    this.shieldBreaks = 0;
+    this.keepCombo = false;
     this.fillPlatforms();
   }
 
@@ -94,7 +129,12 @@ export class GameSession {
     this.jumpHeld = false;
   }
 
+  private get rocketing(): boolean {
+    return this.powers.rocket > 0 || this.rocketSeeking;
+  }
+
   private tryJump(): boolean {
+    if (this.rocketing) return false;
     if (this.cat.jumpsRemaining <= 0) {
       // With both jumps spent, only a near-landing press may be buffered.
       if (this.cat.vy > 0) this.jumpBufferRemaining = PHYSICS.jumpBufferSeconds;
@@ -128,14 +168,20 @@ export class GameSession {
     if (this.cat.grounded && this.jumpBufferRemaining > 0) this.tryJump();
     this.jumpBufferRemaining = Math.max(0, this.jumpBufferRemaining - delta);
     this.coyoteRemaining = Math.max(0, this.coyoteRemaining - delta);
-    if (!this.cat.grounded && this.coyoteRemaining <= 0) {
-      // Walking off spends the ground jump; keep one recovery jump.
-      this.cat.jumpsRemaining = Math.min(1, this.cat.jumpsRemaining);
+    this.tickPowers(delta);
+    if (!this.cat.grounded && this.coyoteRemaining <= 0 && !this.rocketing) {
+      // Walking off spends the ground jump; keep the air jumps.
+      this.cat.jumpsRemaining = Math.min(maxJumpsFor(this.powers) - 1, this.cat.jumpsRemaining);
     }
-    this.cat.vx = difficulty.runSpeed;
     advancePopupHazards(this.platforms, this.cat, delta);
     this.cat.previousX = this.cat.x;
     this.cat.previousY = this.cat.y;
+    const progressBefore = this.progress;
+
+    if (this.rocketing) {
+      this.flyRocket(delta, difficulty.runSpeed);
+    } else {
+    this.cat.vx = difficulty.runSpeed;
     this.cat.x += this.cat.vx * delta;
 
     if (this.cat.grounded && !this.isSupported()) {
@@ -158,14 +204,18 @@ export class GameSession {
       this.cat.y += this.cat.vy * delta;
       this.resolveLanding();
     }
+    }
 
-    if (this.resolveFeatures()) return true;
+    if (this.resolveFeatures(delta)) return true;
 
     this.progress = Math.max(
       this.progress,
       Math.floor(Math.max(0, this.cat.x - 70) / SCORE.distancePixelsPerPoint) + this.landingBonus,
     );
-    this.score = this.progress + this.collectedCount * ROOF_FEATURES.rewardPoints + this.comboBonus;
+    // Double score repeats this step's distance and landing points as a bonus.
+    if (this.powers.double > 0) this.powerBonus += this.progress - progressBefore;
+    this.score = this.progress + this.collectedCount * ROOF_FEATURES.rewardPoints +
+      this.comboBonus + this.powerBonus;
 
     const horizontalLead = Math.max(CAMERA.horizontalLead, this.viewWidth * 0.28);
     this.cameraX = Math.max(this.cameraX, this.cat.x - horizontalLead);
@@ -198,8 +248,75 @@ export class GameSession {
       multiplier: comboMultiplier(this.combo),
       stage: stageAt(this.progress),
       warning: this.currentWarning(),
+      powers: this.powers,
+      rocketing: this.rocketing,
+      powerPickups: this.powerPickups,
+      lastPower: this.lastPower,
+      shieldBreaks: this.shieldBreaks,
       failureReason: this.failureReason,
     };
+  }
+
+  private tickPowers(delta: number): void {
+    const hadFeather = this.powers.feather > 0;
+    for (const kind of ["shield", "feather", "magnet", "double"] as const) {
+      this.powers[kind] = countDown(this.powers[kind], delta);
+    }
+    if (hadFeather && this.powers.feather === 0) {
+      this.cat.jumpsRemaining = Math.min(this.cat.jumpsRemaining, PHYSICS.maxJumps);
+    }
+    this.grace = Math.max(0, this.grace - delta);
+  }
+
+  private collectPower(kind: PowerKind): void {
+    this.powerPickups += 1;
+    this.lastPower = kind;
+    this.powers[kind] = powerDuration(kind);
+    if (kind === "feather") {
+      this.cat.jumpsRemaining = Math.min(maxJumpsFor(this.powers), this.cat.jumpsRemaining + 1);
+    } else if (kind === "rocket") {
+      this.rocketSeeking = false;
+      this.rocketSeekTime = 0;
+      this.jumpBufferRemaining = 0;
+      this.coyoteRemaining = 0;
+      this.cat.grounded = false;
+      this.cat.platformId = null;
+      this.cat.vy = 0;
+    }
+  }
+
+  // Rocket: fast, invulnerable cruise above the roofs; afterwards keep flying
+  // until dropping now lands mid-roof on a plain building, then let go.
+  private flyRocket(delta: number, runSpeed: number): void {
+    const cat = this.cat;
+    cat.grounded = false;
+    cat.platformId = null;
+    cat.vy = 0;
+    cat.vx = runSpeed * POWERS.rocketSpeedRatio;
+    cat.x += cat.vx * delta;
+    const target = Math.max(rocketTargetY(this.platforms, cat), this.cameraY + 110);
+    const climb = POWERS.rocketClimbSpeed * delta;
+    cat.y += Math.max(-climb, Math.min(climb, target - cat.y));
+
+    if (this.powers.rocket > 0) {
+      this.powers.rocket = countDown(this.powers.rocket, delta);
+      if (this.powers.rocket === 0) {
+        this.rocketSeeking = true;
+        this.rocketSeekTime = 0;
+      }
+      return;
+    }
+    this.rocketSeekTime += delta;
+    if (
+      rocketReleaseTarget(this.platforms, cat, runSpeed) !== null ||
+      this.rocketSeekTime >= POWERS.rocketSeekLimitSeconds
+    ) {
+      this.rocketSeeking = false;
+      cat.vx = runSpeed;
+      cat.jumpsRemaining = maxJumpsFor(this.powers);
+      this.grace = POWERS.graceSeconds;
+      this.keepCombo = true;
+    }
   }
 
   private currentWarning(): WorldSnapshot["warning"] {
@@ -215,28 +332,47 @@ export class GameSession {
     return null;
   }
 
-  private resolveFeatures(): boolean {
+  private resolveFeatures(delta: number): boolean {
+    const invulnerable = this.rocketing || this.grace > 0;
     for (const platform of this.platforms) {
       const hazard = platform.hazard;
+      const eagle = platform.eagle;
+      if (eagle) placeEagle(eagle, this.cat);
       let reason: FailureReason | null = null;
-      if (hazard && (!hazard.popup || hazard.popup.phase === "active") && sweptCatIntersects(this.cat, hazard)) {
+      if (
+        hazard && !hazard.broken && (!hazard.popup || hazard.popup.phase === "active") &&
+        sweptCatIntersects(this.cat, hazard)
+      ) {
         reason = hazard.kind === "tower" ? "tower" : "hazard";
       }
-      if (platform.eagle) {
-        placeEagle(platform.eagle, this.cat);
-        if (sweptCatIntersects(this.cat, platform.eagle)) reason = "eagle";
+      if (eagle && !eagle.broken && sweptCatIntersects(this.cat, eagle)) reason = "eagle";
+      if (reason === null || invulnerable) continue;
+      if (this.powers.shield > 0) {
+        // The shield smashes what it hits, then grants a moment of safety.
+        if (reason === "eagle") eagle!.broken = true;
+        else hazard!.broken = true;
+        this.powers.shield = 0;
+        this.grace = POWERS.graceSeconds;
+        this.powerBonus += POWERS.shieldBreakBonus;
+        this.shieldBreaks += 1;
+        continue;
       }
-      if (reason !== null) {
-        this.failureReason = reason;
-        this.clearPendingInput();
-        return true;
-      }
+      this.failureReason = reason;
+      this.clearPendingInput();
+      return true;
     }
+    if (this.powers.magnet > 0) pullRewards(this.platforms, this.cat, delta);
     for (const platform of this.platforms) {
+      const power = platform.power;
+      if (power && !power.collected && sweptCatIntersects(this.cat, power)) {
+        power.collected = true;
+        this.collectPower(power.kind);
+      }
       for (const reward of platform.rewards ?? []) {
         if (!reward.collected && sweptCatIntersects(this.cat, reward)) {
           reward.collected = true;
           this.collectedCount += 1;
+          if (this.powers.double > 0) this.powerBonus += ROOF_FEATURES.rewardPoints;
         }
       }
     }
@@ -296,13 +432,14 @@ export class GameSession {
       this.cat.y = platform.y - this.cat.height;
       this.cat.vy = 0;
       this.cat.grounded = true;
-      this.cat.jumpsRemaining = PHYSICS.maxJumps;
+      this.cat.jumpsRemaining = maxJumpsFor(this.powers);
       this.cat.platformId = platform.id;
       if (platform.id > this.furthestPlatformId) {
         this.landingBonus += SCORE.landingBonus;
         this.furthestPlatformId = platform.id;
         const gapFish = platform.rewards?.find(reward => reward.gap);
-        this.combo = gapFish?.collected ? this.combo + 1 : 0;
+        this.combo = gapFish?.collected ? this.combo + 1 : this.keepCombo ? this.combo : 0;
+        this.keepCombo = false;
         this.bestCombo = Math.max(this.bestCombo, this.combo);
         // Only the extra share is combo bonus; progress (difficulty) stays unaffected.
         this.comboBonus += SCORE.landingBonus * (comboMultiplier(this.combo) - 1);

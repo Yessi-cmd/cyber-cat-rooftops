@@ -17,7 +17,7 @@ export const CONTENT = {
   overlay: {
     ready: {
       title: "赛博小猫跳楼顶",
-      copy: "按住跳得高，轻点是小跳；空中再按一次二段跳。吃到楼间鱼干可叠连击；矮挡板轻跳、高信号塔跳满、低飞的鹰别跳。",
+      copy: "按住跳得高，轻点是小跳；空中再按一次二段跳。吃到楼间鱼干可叠连击，跳起来抢屋顶上的超能力道具；矮挡板轻跳、高信号塔跳满、低飞的鹰别跳。",
       action: "开始跳跃",
     },
     paused: {
@@ -67,6 +67,26 @@ export const CONTENT = {
   result: (score: number, bestScore: number): string =>
     `本局 ${score} · 最高 ${bestScore}`,
   bestCombo: (count: number): string => `最高连击 ${count}`,
+  powers: {
+    names: {
+      shield: "九命护盾",
+      feather: "三段跳羽毛",
+      rocket: "火箭冲刺",
+      magnet: "鱼干磁铁",
+      double: "双倍得分",
+    },
+    pickup: {
+      shield: "九命护盾！能挡一次碰撞",
+      feather: "羽毛！空中可以跳三次",
+      rocket: "火箭冲刺！无敌飞行",
+      magnet: "磁铁！鱼干自动飞过来",
+      double: "双倍得分！",
+    },
+    smash: "护盾撞碎了障碍！+20",
+    chip: (name: string, seconds: number): string => `${name} ${seconds}s`,
+    rocketLanding: "火箭降落中",
+    listLabel: "生效中的能力",
+  },
   race: {
     invite: "邀请好友竞速",
     catNames: ["橘猫", "灰猫", "黑猫", "白猫"] as const,

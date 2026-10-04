@@ -1,5 +1,5 @@
 import { GAME_HEIGHT, GAME_WIDTH } from "../game/config";
-import type { Eagle, GameState, Hazard, WorldSnapshot, WorldRect } from "../game/types";
+import type { Eagle, GameState, Hazard, PowerItem, WorldSnapshot, WorldRect } from "../game/types";
 
 // Render-only view of a race opponent (see src/net/race-controller.ts).
 export interface RaceGhost {
@@ -12,7 +12,8 @@ export interface RaceGhost {
 }
 import { LAND_ANIMATION_DURATION_MS, selectCatPose, type CatPose } from "./cat-animation";
 import { EffectLayer } from "./effects";
-import { CAT_COATS, PALETTE, type CatCoat } from "./palette";
+import { CAT_COATS, PALETTE, POWER_COLORS, type CatCoat } from "./palette";
+import { POWERS } from "../game/config";
 import {
   getRoofDecorationOffset,
   hasVentSteam,
@@ -64,7 +65,9 @@ export class Renderer {
       this.effects.shakeOffsetX(nowMs, reducedMotion),
       this.effects.shakeOffsetY(nowMs, reducedMotion),
     );
-    if (gameState === "playing" && !reducedMotion) this.drawSpeedLines(snapshot.cat.vx, nowMs);
+    if (gameState === "playing" && !reducedMotion) {
+      this.drawSpeedLines(snapshot.rocketing ? snapshot.cat.vx * 1.4 : snapshot.cat.vx, nowMs);
+    }
     this.drawPlatforms(snapshot, true, nowMs);
     this.drawFeatures(snapshot, reducedMotion, nowMs);
     this.drawGhosts(ghosts, snapshot, reducedMotion, nowMs);
@@ -256,7 +259,9 @@ export class Renderer {
   private drawFeatures(snapshot: WorldSnapshot, reducedMotion: boolean, nowMs: number): void {
     const context = this.context;
     for (const platform of snapshot.platforms) {
-      if (platform.hazard?.kind === "tower") {
+      if (platform.hazard?.broken) {
+        // Smashed by a shield: nothing left to draw.
+      } else if (platform.hazard?.kind === "tower") {
         this.drawSignalTower(platform.hazard, snapshot.cameraX, snapshot.cameraY);
       } else if (platform.hazard && platform.hazard.popup?.phase !== "hidden") {
         const x = Math.round(platform.hazard.x - snapshot.cameraX);
@@ -293,7 +298,10 @@ export class Renderer {
     }
     // Eagles fly over everything on the roof, so draw them last.
     for (const platform of snapshot.platforms) {
-      if (platform.eagle) this.drawEagle(platform.eagle, snapshot.cameraX, snapshot.cameraY, reducedMotion, nowMs);
+      if (platform.power && !platform.power.collected) {
+        this.drawPowerItem(platform.power, snapshot.cameraX, snapshot.cameraY, reducedMotion, nowMs);
+      }
+      if (platform.eagle && !platform.eagle.broken) this.drawEagle(platform.eagle, snapshot.cameraX, snapshot.cameraY, reducedMotion, nowMs);
     }
   }
 
@@ -496,17 +504,120 @@ export class Renderer {
     this.drawCatSprite(x, y, pose, coat);
     if (angle !== 0) context.restore();
 
-    // A gold star above the head while a mid-air jump is still available.
-    if (gameState === "playing" && !cat.grounded && cat.jumpsRemaining > 0) {
-      const starX = x + 9;
-      const starY = y - 11;
-      context.fillStyle = PALETTE.blackPurple;
-      context.fillRect(starX - 1, starY + 1, 9, 5);
-      context.fillRect(starX + 2, starY - 2, 3, 11);
+    // One gold star above the head per mid-air jump still available.
+    if (gameState === "playing" && !cat.grounded && !snapshot.rocketing && cat.jumpsRemaining > 0) {
+      const count = Math.min(2, cat.jumpsRemaining);
+      for (let index = 0; index < count; index += 1) {
+        const starX = x + 9 + (index - (count - 1) / 2) * 12;
+        const starY = y - 11;
+        context.fillStyle = PALETTE.blackPurple;
+        context.fillRect(starX - 1, starY + 1, 9, 5);
+        context.fillRect(starX + 2, starY - 2, 3, 11);
+        context.fillStyle = PALETTE.reward;
+        context.fillRect(starX, starY + 2, 7, 3);
+        context.fillRect(starX + 3, starY - 1, 1, 9);
+        context.fillRect(starX + 2, starY + 1, 3, 5);
+      }
+    }
+    if (gameState === "playing" || gameState === "paused") this.drawPowerAuras(snapshot, x, y, reducedMotion, nowMs);
+  }
+
+  // Active powers drawn around the cat; reduced motion removes flicker and bob.
+  private drawPowerAuras(snapshot: WorldSnapshot, x: number, y: number, reducedMotion: boolean, nowMs: number): void {
+    const context = this.context;
+    const { powers } = snapshot;
+    const blink = (remaining: number): boolean =>
+      !reducedMotion && remaining < 2 && Math.floor(nowMs / 120) % 2 === 0;
+    if (snapshot.rocketing) {
+      const flicker = reducedMotion ? 0 : Math.floor(nowMs / 60) % 3;
+      context.fillStyle = POWER_COLORS.rocket;
+      context.fillRect(x - 14 - flicker * 2, y + 12, 12 + flicker * 2, 6);
       context.fillStyle = PALETTE.reward;
-      context.fillRect(starX, starY + 2, 7, 3);
-      context.fillRect(starX + 3, starY - 1, 1, 9);
-      context.fillRect(starX + 2, starY + 1, 3, 5);
+      context.fillRect(x - 8, y + 13, 6, 4);
+      context.fillStyle = PALETTE.blackPurple;
+      context.fillRect(x - 3, y + 9, 6, 12);
+    }
+    if (powers.feather > 0 && !blink(powers.feather)) {
+      const flap = reducedMotion ? 0 : Math.floor(nowMs / 160) % 2;
+      context.fillStyle = PALETTE.night;
+      context.fillRect(x + 3, y + 4 - flap * 2, 10, 4);
+      context.fillRect(x + 1, y + 1 - flap * 2, 8, 3);
+      context.fillStyle = POWER_COLORS.feather;
+      context.fillRect(x + 3, y + 8 - flap * 2, 10, 2);
+    }
+    if (powers.magnet > 0 && !blink(powers.magnet)) {
+      context.globalAlpha = 0.18;
+      context.strokeStyle = POWER_COLORS.magnet;
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(x + 12, y + 14, POWERS.magnetRadius, 0, Math.PI * 2);
+      context.stroke();
+      context.globalAlpha = 1;
+    }
+    if (powers.shield > 0 && !blink(powers.shield)) {
+      context.globalAlpha = 0.55;
+      context.strokeStyle = POWER_COLORS.shield;
+      context.lineWidth = 3;
+      context.beginPath();
+      context.arc(x + 12, y + 14, 23, 0, Math.PI * 2);
+      context.stroke();
+      context.globalAlpha = 1;
+    }
+  }
+
+  // 18×18 pickup: dark frame, coloured fill and a glyph per power.
+  private drawPowerItem(item: PowerItem, cameraX: number, cameraY: number, reducedMotion: boolean, nowMs: number): void {
+    const bob = reducedMotion ? 0 : Math.round(Math.sin(nowMs / 220 + item.x * 0.01) * 2);
+    const x = Math.round(item.x - cameraX);
+    const y = Math.round(item.y - cameraY) + bob;
+    if (x + item.width < 0 || x > this.logicalWidth) return;
+    const context = this.context;
+    context.fillStyle = PALETTE.blackPurple;
+    context.fillRect(x, y + 1, 18, 16);
+    context.fillRect(x + 1, y, 16, 18);
+    context.fillStyle = POWER_COLORS[item.kind];
+    context.fillRect(x + 2, y + 2, 14, 14);
+    context.fillStyle = PALETTE.night;
+    switch (item.kind) {
+      case "shield": // bubble with a highlight
+        context.fillRect(x + 6, y + 4, 6, 2);
+        context.fillRect(x + 4, y + 6, 2, 6);
+        context.fillRect(x + 12, y + 6, 2, 6);
+        context.fillRect(x + 6, y + 12, 6, 2);
+        context.fillRect(x + 7, y + 7, 2, 2);
+        break;
+      case "feather": // diagonal quill
+        for (let index = 0; index < 5; index += 1) context.fillRect(x + 4 + index * 2, y + 12 - index * 2, 3, 3);
+        context.fillRect(x + 4, y + 13, 2, 2);
+        break;
+      case "rocket": // nose, body and fins
+        context.fillRect(x + 8, y + 3, 2, 2);
+        context.fillRect(x + 7, y + 5, 4, 7);
+        context.fillRect(x + 5, y + 10, 2, 3);
+        context.fillRect(x + 11, y + 10, 2, 3);
+        context.fillStyle = PALETTE.reward;
+        context.fillRect(x + 8, y + 12, 2, 3);
+        break;
+      case "magnet": // U shape with light tips
+        context.fillRect(x + 4, y + 4, 3, 8);
+        context.fillRect(x + 11, y + 4, 3, 8);
+        context.fillRect(x + 4, y + 11, 10, 3);
+        context.fillStyle = PALETTE.catCream;
+        context.fillRect(x + 4, y + 4, 3, 2);
+        context.fillRect(x + 11, y + 4, 3, 2);
+        break;
+      case "double": // "x2"
+        context.fillRect(x + 3, y + 6, 2, 2);
+        context.fillRect(x + 7, y + 6, 2, 2);
+        context.fillRect(x + 5, y + 8, 2, 2);
+        context.fillRect(x + 3, y + 10, 2, 2);
+        context.fillRect(x + 7, y + 10, 2, 2);
+        context.fillRect(x + 10, y + 5, 5, 2);
+        context.fillRect(x + 13, y + 7, 2, 2);
+        context.fillRect(x + 10, y + 9, 5, 2);
+        context.fillRect(x + 10, y + 11, 2, 2);
+        context.fillRect(x + 10, y + 12, 5, 2);
+        break;
     }
   }
 

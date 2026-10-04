@@ -35,6 +35,8 @@ export type RoofFeatureKind = HazardKind | "eagle";
 
 export interface Hazard extends WorldRect {
   kind?: HazardKind;
+  // Smashed by a shield: harmless and no longer drawn.
+  broken?: boolean;
   popup?: { phase: "hidden" | "warning" | "active"; elapsed: number };
 }
 
@@ -42,7 +44,18 @@ export interface Hazard extends WorldRect {
 // always meet at `crossX` (world x of both centres) mid-roof.
 export interface Eagle extends WorldRect {
   crossX: number;
+  broken?: boolean;
 }
+
+export type PowerKind = "shield" | "feather" | "rocket" | "magnet" | "double";
+
+export interface PowerItem extends WorldRect {
+  kind: PowerKind;
+  collected: boolean;
+}
+
+// Seconds remaining for each power; 0 means inactive.
+export type PowerTimers = Record<PowerKind, number>;
 
 export type FailureReason = "fall" | "hazard" | "tower" | "eagle";
 
@@ -55,6 +68,7 @@ export interface Platform {
   gapKind?: GapKind;
   hazard?: Hazard;
   eagle?: Eagle;
+  power?: PowerItem;
   rewards?: Reward[];
 }
 
@@ -71,5 +85,11 @@ export interface WorldSnapshot {
   multiplier: number;
   stage: number;
   warning: "popup" | "eagle" | null;
+  powers: Readonly<PowerTimers>;
+  rocketing: boolean;
+  // Monotonic counters so the UI can play cues without diffing the world.
+  powerPickups: number;
+  lastPower: PowerKind | null;
+  shieldBreaks: number;
   failureReason: FailureReason | null;
 }

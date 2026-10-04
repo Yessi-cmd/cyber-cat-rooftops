@@ -6,7 +6,9 @@ export type SoundCue =
   | "fail"
   | "toggle"
   | "collect"
-  | "milestone";
+  | "milestone"
+  | "power"
+  | "smash";
 
 interface CueDefinition {
   frequencies: readonly number[];
@@ -30,6 +32,8 @@ const CUES: Record<SoundCue, CueDefinition> = {
   jump: { frequencies: [330, 520], duration: 0.09, gain: 0.035, type: "square" },
   doubleJump: { frequencies: [520, 700, 880], duration: 0.1, gain: 0.03, type: "square" },
   milestone: { frequencies: [523, 659, 784, 1046], duration: 0.28, gain: 0.03, type: "square" },
+  power: { frequencies: [392, 587, 784, 1175], duration: 0.24, gain: 0.03, type: "triangle" },
+  smash: { frequencies: [180, 120, 90], duration: 0.18, gain: 0.035, type: "sawtooth" },
   land: { frequencies: [150, 110], duration: 0.07, gain: 0.025, type: "triangle" },
   score: { frequencies: [660, 880], duration: 0.11, gain: 0.025, type: "square" },
   fail: { frequencies: [220, 165, 110], duration: 0.24, gain: 0.032, type: "sawtooth" },

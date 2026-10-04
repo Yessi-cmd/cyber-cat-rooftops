@@ -8,7 +8,8 @@ import type { GameState, WorldSnapshot } from "./game/types";
 import { InputController, type InputAction } from "./input/input-controller";
 import { RaceController } from "./net/race-controller";
 import { raceServerUrl } from "./net/race-client";
-import { PALETTE } from "./render/palette";
+import { PALETTE, POWER_COLORS } from "./render/palette";
+import { POWER_KINDS } from "./game/powers";
 import { Renderer } from "./render/renderer";
 import { loadSave, saveBestScore, saveMuted } from "./storage/preferences";
 import { renderUiIcon } from "./ui/icons";
@@ -38,6 +39,10 @@ class GameApp {
   private readonly hazardStatus = requiredElement<HTMLElement>("#hazard-status");
   private readonly comboElement = requiredElement<HTMLElement>("#combo-count");
   private readonly banner = requiredElement<HTMLElement>("#banner");
+  private readonly powerList = requiredElement<HTMLElement>("#power-list");
+  private powerListKey = "";
+  private lastPowerPickups = 0;
+  private lastShieldBreaks = 0;
   private readonly secondaryButton = requiredElement<HTMLButtonElement>("#secondary-button");
   private readonly racePlayers = requiredElement<HTMLOListElement>("#race-players");
   private readonly raceInvite = requiredElement<HTMLElement>("#race-invite");
@@ -161,6 +166,7 @@ class GameApp {
       this.comboElement.dataset.tier = (snapshot.multiplier - 1).toString();
       this.comboElement.textContent = CONTENT.combo(snapshot.combo, snapshot.multiplier);
     }
+    this.renderPowerList(snapshot);
     this.announceMilestones(snapshot, time);
     const view = this.race.view;
     this.renderer.draw(
@@ -279,6 +285,30 @@ class GameApp {
     }
   };
 
+  // Chips for active powers; rebuilt only when a whole second ticks over.
+  private renderPowerList(snapshot: WorldSnapshot): void {
+    let key = "";
+    for (const kind of POWER_KINDS) {
+      const remaining = kind === "rocket" && snapshot.rocketing ? Math.max(1, snapshot.powers.rocket) : snapshot.powers[kind];
+      if (remaining > 0) key += kind + ":" + Math.ceil(remaining) + "|";
+    }
+    if (key === this.powerListKey) return;
+    this.powerListKey = key;
+    this.powerList.replaceChildren();
+    for (const kind of POWER_KINDS) {
+      const remaining = snapshot.powers[kind];
+      if (remaining <= 0 && !(kind === "rocket" && snapshot.rocketing)) continue;
+      const chip = document.createElement("span");
+      chip.className = "power-chip";
+      chip.style.background = POWER_COLORS[kind];
+      chip.dataset.ending = String(remaining < 2);
+      chip.textContent = remaining > 0
+        ? CONTENT.powers.chip(CONTENT.powers.names[kind], Math.ceil(remaining))
+        : CONTENT.powers.rocketLanding;
+      this.powerList.append(chip);
+    }
+  }
+
   private announceMilestones(snapshot: WorldSnapshot, time: number): void {
     if (this.stateMachine.state === "playing") {
       let message: string | null = null;
@@ -302,7 +332,7 @@ class GameApp {
     }
   }
 
-  private showBanner(message: string, time: number): void {
+  private showBanner(message: string, time: number, cue: "milestone" | null = "milestone"): void {
     this.banner.textContent = message;
     this.banner.hidden = false;
     // Restart the CSS pop animation for back-to-back milestones.
@@ -311,7 +341,7 @@ class GameApp {
     this.banner.classList.add("is-showing");
     this.bannerHideAt = time + 1400;
     this.liveStatus.textContent = message;
-    this.audio.play("milestone");
+    if (cue !== null) this.audio.play(cue);
   }
 
   private resetRunUi(): void {
@@ -460,6 +490,8 @@ class GameApp {
     this.lastJumpCount = 0;
     this.lastCollectedCount = 0;
     this.lastPlatformId = 0;
+    this.lastPowerPickups = 0;
+    this.lastShieldBreaks = 0;
     this.renderer.effects.clear();
     this.resetRunUi();
   }
@@ -559,6 +591,21 @@ class GameApp {
       effects.burst(cat.x + cat.width / 2, cat.y + 6, 6, PALETTE.reward, 0.14, 0.12, now);
     }
     this.lastCollectedCount = snapshot.collectedCount;
+    if (snapshot.powerPickups > this.lastPowerPickups && snapshot.lastPower !== null) {
+      const kind = snapshot.lastPower;
+      this.audio.play("power");
+      effects.burst(cat.x + cat.width / 2, cat.y + 4, 12, POWER_COLORS[kind], 0.2, 0.16, now);
+      this.showBanner(CONTENT.powers.pickup[kind], now, null);
+    }
+    this.lastPowerPickups = snapshot.powerPickups;
+    if (snapshot.shieldBreaks > this.lastShieldBreaks) {
+      this.audio.play("smash");
+      effects.shake(2, 160, now);
+      effects.burst(cat.x + cat.width + 6, cat.y + cat.height / 2, 16, PALETTE.hazard, 0.26, 0.18, now);
+      effects.floatText(cat.x + cat.width / 2, cat.y - 10, "+20", POWER_COLORS.shield, now);
+      this.liveStatus.textContent = CONTENT.powers.smash;
+    }
+    this.lastShieldBreaks = snapshot.shieldBreaks;
     if (!this.lastGrounded && cat.grounded) {
       this.renderer.triggerLanding();
       this.audio.play("land");

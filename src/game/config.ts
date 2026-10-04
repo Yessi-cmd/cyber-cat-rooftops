@@ -70,6 +70,30 @@ export const ROOF_FEATURES = {
   rewardPoints: 5,
 } as const;
 
+// Power-ups float above plain roofs; every duration runs on simulation time.
+export const POWERS = {
+  firstRoofId: 5,
+  minRoofSpacing: 5,
+  chance: 0.2, // per eligible plain roof
+  weights: { shield: 25, feather: 20, rocket: 15, magnet: 20, double: 20 },
+  itemSize: 18,
+  itemLift: 44, // px from roof top to item centre: a running cat passes under, any hop takes it
+  shieldSeconds: 15,
+  shieldBreakBonus: 20,
+  graceSeconds: 0.4, // invulnerable after the shield breaks or a rocket lands
+  featherSeconds: 8,
+  rocketSeconds: 3,
+  rocketSpeedRatio: 1.5,
+  rocketClearance: 50, // px between the cat and the highest roof top ahead
+  rocketClimbSpeed: 320, // px/s while matching that altitude
+  rocketLookahead: 420, // px of roofs ahead that set the altitude
+  rocketSeekLimitSeconds: 4, // safety: release even without an ideal roof
+  magnetSeconds: 8,
+  magnetRadius: 120,
+  magnetPullSpeed: 520,
+  doubleSeconds: 8,
+} as const;
+
 export const CAMERA = {
   horizontalLead: 112,
   verticalLead: 520,

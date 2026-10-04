@@ -34,3 +34,12 @@ export const CAT_COATS: readonly CatCoat[] = [
   { fur: "#3f4844", cream: "#cfd5cf", tag: "#26302b" },
   { fur: "#ebe5d8", cream: "#fffaf0", tag: "#7a6a4b" },
 ];
+
+// Power-up accents: distinct hues that still read on the light office page.
+export const POWER_COLORS = {
+  shield: "#3f7f9c",
+  feather: "#4f8a72",
+  rocket: "#b2513f",
+  magnet: "#8a4f6e",
+  double: "#916b20",
+} as const;
